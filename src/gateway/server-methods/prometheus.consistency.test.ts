@@ -4,9 +4,13 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
-import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./prometheus-methods.js";
+import {
+  PROMETHEUS_GATEWAY_METHOD_METADATA,
+  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
+} from "./prometheus-methods.js";
 import {
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
+  PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
 import { prometheusHandlers } from "./prometheus.js";
@@ -310,6 +314,12 @@ describe("prometheus adapter summary consistency", () => {
         .filter((action) => action.mutatesState)
         .map((action) => action.action)
         .toSorted(),
+    );
+    expect(payload.methods.map((method) => method.method)).toEqual(
+      expect.not.arrayContaining(Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA)),
+    );
+    expect(payload.controlPreview.actions.map((action) => action.action)).toEqual(
+      expect.not.arrayContaining(Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)),
     );
     expect(payload.guardrails.plannedMutatingMethods.length).toBeGreaterThan(0);
     expect(payload.guardrails.plannedMutatingMethods).toEqual(
