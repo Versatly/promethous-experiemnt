@@ -122,6 +122,20 @@ These methods are intentionally scoped to telemetry and read models. They do not
 Compatibility tests lock this response shape so method consumers can rely on stable key-level
 contracts during migration.
 
+### Adapter compatibility test matrix
+
+Gateway parity is validated with dedicated compatibility tests:
+
+- handler behavior tests
+- authorization matrix tests (read/write scopes and role restrictions)
+- response-shape contract tests
+- error-shape parity tests
+- e2e request/response tests across all `prometheus.*` methods
+- cross-adapter summary consistency tests (`status` vs subsystem adapters)
+
+When adding a new `prometheus.*` method, update this full matrix so compatibility regressions are
+caught before cutover.
+
 ### Access policy
 
 All `prometheus.*` gateway adapters are read-scope methods:
