@@ -586,3 +586,121 @@ describe("prometheusHandlers.prometheus.monolith", () => {
     );
   });
 });
+
+describe("prometheusHandlers.prometheus.control.preview", () => {
+  it("returns AUTARCH gap-detection preview without mutating state", async () => {
+    const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-goal",
+        type: "goal.created",
+        occurredAt: 1,
+        payload: {
+          goalId: "goal-root",
+          title: "Root objective",
+          objective: "ship system",
+          priority: 100,
+        },
+      },
+      {
+        id: "evt-goal-status",
+        type: "goal.status-updated",
+        occurredAt: 2,
+        payload: {
+          goalId: "goal-root",
+          status: "blocked",
+        },
+      },
+    ]);
+
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-1", method: "prometheus.control.preview" },
+      params: {
+        stateDir,
+        action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        action: "autarch.gap-detection",
+        mutatesState: false,
+        preview: expect.objectContaining({
+          suggestedGapCount: 1,
+        }),
+      }),
+      undefined,
+    );
+  });
+
+  it("returns recursion mutation evaluation preview", async () => {
+    const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-goal",
+      type: "goal.created",
+      occurredAt: 1,
+      payload: {
+        goalId: "goal-root",
+        title: "Root objective",
+        objective: "ship system",
+        priority: 100,
+      },
+    });
+
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-2", method: "prometheus.control.preview" },
+      params: {
+        stateDir,
+        action: "recursion.mutation-evaluation",
+        proposal: {
+          mutationId: "mut-1",
+          title: "Increase horizon",
+          hypothesis: "better long-range trajectory",
+          risk: "low",
+          expectedGain: 0.1,
+        },
+        baseline: {
+          objectiveFit: 0.55,
+          stability: 0.7,
+          throughput: 0.5,
+        },
+        candidate: {
+          objectiveFit: 0.7,
+          stability: 0.72,
+          throughput: 0.52,
+        },
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        action: "recursion.mutation-evaluation",
+        mutatesState: false,
+        preview: expect.objectContaining({
+          evaluation: expect.objectContaining({
+            mutationId: "mut-1",
+          }),
+        }),
+      }),
+      undefined,
+    );
+  });
+});

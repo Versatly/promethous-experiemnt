@@ -9,7 +9,7 @@ export const PROMETHEUS_GATEWAY_READ_METHODS = [
 
 // Reserved for future state-mutating/control APIs.
 // Keeping this explicit prevents accidental method-scope drift when writes are introduced.
-export const PROMETHEUS_GATEWAY_WRITE_METHODS = [] as const;
+export const PROMETHEUS_GATEWAY_WRITE_METHODS = ["prometheus.control.preview"] as const;
 
 export const PROMETHEUS_GATEWAY_METHODS = [
   ...PROMETHEUS_GATEWAY_READ_METHODS,

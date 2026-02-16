@@ -21,8 +21,8 @@ describe("PROMETHEUS method access map", () => {
     ]);
   });
 
-  it("keeps current migration phase methods read-only", () => {
-    expect(PROMETHEUS_GATEWAY_WRITE_METHODS).toEqual([]);
+  it("declares explicit control-surface write methods", () => {
+    expect(PROMETHEUS_GATEWAY_WRITE_METHODS).toEqual(["prometheus.control.preview"]);
     expect(PROMETHEUS_GATEWAY_READ_METHODS.length).toBeGreaterThan(0);
   });
 });

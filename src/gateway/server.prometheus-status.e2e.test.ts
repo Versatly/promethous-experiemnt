@@ -601,6 +601,99 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("allows operator.write scope for prometheus.control.preview", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-control-goal",
+        type: "goal.created",
+        occurredAt: 50,
+        payload: {
+          goalId: "goal-control",
+          title: "Control goal",
+          objective: "Control preview",
+          priority: 90,
+        },
+      },
+      {
+        id: "evt-control-goal-status",
+        type: "goal.status-updated",
+        occurredAt: 51,
+        payload: {
+          goalId: "goal-control",
+          status: "blocked",
+        },
+      },
+    ]);
+
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-write-allow",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-write-allow",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      payload?: {
+        action?: string;
+        mutatesState?: boolean;
+        preview?: { suggestedGapCount?: number };
+      };
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.action).toBe("autarch.gap-detection");
+    expect(response.payload?.mutatesState).toBe(false);
+    expect(response.payload?.preview?.suggestedGapCount).toBeGreaterThanOrEqual(1);
+    expect(response.error).toBeUndefined();
+    ws.close();
+  });
+
+  it("rejects operator.read scope for prometheus.control.preview", async () => {
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.read"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-read-deny",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-read-deny",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.message).toContain("operator.write");
+    ws.close();
+  });
+
   it("keeps status and autarch summary counts consistent in e2e flow", async () => {
     const stateDir = resolveStateDir();
     const eventStore = createFilePrometheusEventStore(

@@ -38,6 +38,10 @@ describe("prometheus handler error shape parity", () => {
       { method: "prometheus.goals", params: { stateDir } },
       { method: "prometheus.recursion", params: { stateDir } },
       { method: "prometheus.autarch", params: { stateDir } },
+      {
+        method: "prometheus.control.preview",
+        params: { stateDir, action: "autarch.gap-detection" },
+      },
       { method: "prometheus.monolith", params: { stateDir } },
     ];
 

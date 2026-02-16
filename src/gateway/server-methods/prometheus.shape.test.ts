@@ -136,6 +136,10 @@ describe("prometheus handlers response shape", () => {
     const goalsPayload = await call("prometheus.goals", { stateDir });
     const recursionPayload = await call("prometheus.recursion", { stateDir });
     const autarchPayload = await call("prometheus.autarch", { stateDir });
+    const controlPreviewPayload = await call("prometheus.control.preview", {
+      stateDir,
+      action: "autarch.gap-detection",
+    });
     const monolithPayload = await call("prometheus.monolith", { stateDir });
 
     expect(payloadTopKeys(statusPayload)).toEqual([
@@ -164,6 +168,12 @@ describe("prometheus handlers response shape", () => {
       "goalsWithUnresolvedGaps",
       "graph",
       "summary",
+      "ts",
+    ]);
+    expect(payloadTopKeys(controlPreviewPayload)).toEqual([
+      "action",
+      "mutatesState",
+      "preview",
       "ts",
     ]);
     expect(payloadTopKeys(monolithPayload)).toEqual([

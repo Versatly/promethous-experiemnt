@@ -75,6 +75,7 @@ read-only compatibility adapters under the `prometheus.*` namespace:
 4. `prometheus.recursion`
 5. `prometheus.autarch`
 6. `prometheus.monolith`
+7. `prometheus.control.preview`
 
 These methods are intentionally scoped to telemetry and read models. They do not mutate state.
 
@@ -118,6 +119,11 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `totalsByForm`
   - `institutions`
   - `allocationPreview`
+- `prometheus.control.preview`:
+  - `ts`
+  - `action`
+  - `mutatesState`
+  - `preview`
 
 Compatibility tests lock this response shape so method consumers can rely on stable key-level
 contracts during migration.
@@ -138,11 +144,15 @@ caught before cutover.
 
 ### Access policy
 
-All `prometheus.*` gateway adapters are read-scope methods:
+PROMETHEUS adapters are split between read telemetry and control preview surfaces:
 
-- allowed for `operator.read`, `operator.write`, and `operator.admin`
-- rejected when read scope is missing.
-- rejected for `node` role (operator-only read adapters).
+- Read telemetry adapters (`status`, `trajectory`, `goals`, `recursion`, `autarch`, `monolith`):
+  - allowed for `operator.read`, `operator.write`, and `operator.admin`
+  - rejected when read scope is missing.
+- Control preview adapter (`prometheus.control.preview`):
+  - allowed for `operator.write` and `operator.admin`
+  - rejected when write scope is missing.
+- All `prometheus.*` adapters are rejected for `node` role.
 
 This keeps parity with existing gateway authorization semantics for telemetry methods.
 
