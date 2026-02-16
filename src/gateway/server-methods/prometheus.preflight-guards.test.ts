@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatPrometheusMissingRequiredParamsMessage,
   formatPrometheusRequiredParamsMessage,
+  hasPrometheusInvalidRequiredParams,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
@@ -65,5 +66,9 @@ describe("prometheus preflight guardrail messages", () => {
     ).toBe(
       'action "recursion.mutation-evaluation" is missing required params: baseline, candidate',
     );
+    expect(hasPrometheusInvalidRequiredParams(["proposal", "baseline", "candidate"])).toBe(false);
+    expect(hasPrometheusInvalidRequiredParams(["proposal", "proposal"])).toBe(true);
+    expect(hasPrometheusInvalidRequiredParams(["proposal", ""])).toBe(true);
+    expect(hasPrometheusInvalidRequiredParams(["proposal", "   "])).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import {
   formatPrometheusRequiredParamsMessage,
+  hasPrometheusInvalidRequiredParams,
   formatPlannedMutatingMethodDisabledMessage,
   formatPlannedMutatingMethodNotImplementedMessage,
 } from "./prometheus.preflight-guards.js";
@@ -242,8 +243,7 @@ export function assertPrometheusPlannedMutatingMethodContract(args: {
         `PROMETHEUS planned method contract mismatch: ${method} has invalid env guard`,
       );
     }
-    const params = [...metadata.requiredParams];
-    if (params.some((param) => param.length === 0) || new Set(params).size !== params.length) {
+    if (hasPrometheusInvalidRequiredParams(metadata.requiredParams)) {
       throw new Error(
         `PROMETHEUS planned method contract mismatch: ${method} has invalid required params`,
       );

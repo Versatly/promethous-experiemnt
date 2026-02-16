@@ -20,6 +20,7 @@ import {
   resolveTrajectoryWindowSize,
 } from "./prometheus.params.js";
 import {
+  hasPrometheusInvalidRequiredParams,
   formatPrometheusRequiredParamsMessage,
   formatPrometheusMissingRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
@@ -184,8 +185,7 @@ export function assertPrometheusControlPreviewActionContract(args: {
         `PROMETHEUS control action contract mismatch: ${action} missing required params`,
       );
     }
-    const params = [...actionMetadata[action].requiredParams];
-    if (params.some((param) => param.length === 0) || new Set(params).size !== params.length) {
+    if (hasPrometheusInvalidRequiredParams(actionMetadata[action].requiredParams)) {
       throw new Error(
         `PROMETHEUS control action contract mismatch: ${action} has invalid required params`,
       );
@@ -221,8 +221,7 @@ export function assertPrometheusPlannedMutatingPreviewActionContract(args: {
         `PROMETHEUS planned control action contract mismatch: ${action} missing required params`,
       );
     }
-    const params = [...metadata.requiredParams];
-    if (params.some((param) => param.length === 0) || new Set(params).size !== params.length) {
+    if (hasPrometheusInvalidRequiredParams(metadata.requiredParams)) {
       throw new Error(
         `PROMETHEUS planned control action contract mismatch: ${action} has invalid required params`,
       );

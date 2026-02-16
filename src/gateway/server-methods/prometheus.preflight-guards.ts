@@ -36,6 +36,13 @@ export function resolvePrometheusMissingRequiredParams(args: {
   });
 }
 
+export function hasPrometheusInvalidRequiredParams(requiredParams: readonly string[]): boolean {
+  if (requiredParams.some((param) => param.trim().length === 0)) {
+    return true;
+  }
+  return new Set(requiredParams).size !== requiredParams.length;
+}
+
 export function formatPrometheusRequiredParamsMessage(args: {
   kind: PrometheusControlSurfaceKind;
   name: string;
