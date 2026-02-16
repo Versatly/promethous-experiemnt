@@ -179,6 +179,33 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
     });
   });
 
+  it("keeps non-operator role denial precedence over admin scopes for unknown methods", async () => {
+    const { unknownMethodHandler, authOverrides, respond } = createUnknownMethodDispatchHarness(
+      "non-operator unknown method",
+    );
+    await runPrometheusRoleRequest({
+      role: "auditor",
+      request: {
+        id: "unknown-prometheus-method-non-operator-admin-scope-short-circuit",
+        method: UNKNOWN_PROMETHEUS_METHOD,
+        params: {},
+      },
+      scopes: ["operator.admin"],
+      authOverrides,
+      extraHandlers: {
+        [UNKNOWN_PROMETHEUS_METHOD]: unknownMethodHandler,
+      },
+      respond,
+    });
+
+    expectPrometheusAuthShortCircuitBeforeDispatch({
+      respond,
+      handler: unknownMethodHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: auditor",
+    });
+  });
+
   it("does not dispatch injected unknown handlers when runtime role value is malformed", async () => {
     const { unknownMethodHandler, authOverrides, respond } =
       createUnknownMethodDispatchHarness("malformed unknown role");
