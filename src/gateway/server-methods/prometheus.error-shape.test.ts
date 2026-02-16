@@ -1,10 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+  resolvePrometheusEventLogPath,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -15,7 +18,7 @@ afterEach(async () => {
 describe("prometheus handler error shape parity", () => {
   it("uses consistent internal error code for malformed event logs", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-errors-");
-    const eventLogPath = path.join(stateDir, "prometheus", "events.jsonl");
+    const eventLogPath = resolvePrometheusEventLogPath(stateDir);
     await fs.mkdir(path.dirname(eventLogPath), { recursive: true });
     await fs.writeFile(eventLogPath, "{", "utf8");
 
@@ -57,9 +60,7 @@ describe("prometheus handler error shape parity", () => {
 
   it("uses INVALID_REQUEST for trajectory validation failures", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-errors-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.append({
       id: "evt-1",
       type: "goal.created",

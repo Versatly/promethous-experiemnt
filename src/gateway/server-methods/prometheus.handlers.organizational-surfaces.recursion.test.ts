@@ -1,8 +1,9 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -13,9 +14,7 @@ afterEach(async () => {
 describe("prometheusHandlers.prometheus.recursion", () => {
   it("returns recursion cycle telemetry window and acceptance ratios", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-recursion-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.appendBatch([
       {
         id: "evt-goal",

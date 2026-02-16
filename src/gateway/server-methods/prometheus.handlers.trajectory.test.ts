@@ -1,11 +1,10 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createFileHeliosTrajectoryStore,
-  createFilePrometheusEventStore,
-} from "../../prometheus/index.js";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+  createPrometheusTrajectoryStoreForStateDir,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -17,9 +16,7 @@ afterEach(async () => {
 describe("prometheusHandlers.prometheus.trajectory", () => {
   it("returns trajectory window and divergence for requested goal", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-trajectory-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.append({
       id: "evt-goal",
       type: "goal.created",
@@ -31,9 +28,7 @@ describe("prometheusHandlers.prometheus.trajectory", () => {
         priority: 100,
       },
     });
-    const trajectoryStore = createFileHeliosTrajectoryStore(
-      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
-    );
+    const trajectoryStore = createPrometheusTrajectoryStoreForStateDir(stateDir);
     await trajectoryStore.appendBatch([
       {
         goalId: "goal-root",

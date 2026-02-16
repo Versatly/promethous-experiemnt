@@ -1,9 +1,10 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
-import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -14,9 +15,7 @@ afterEach(async () => {
 describe("prometheus adapter summary consistency", () => {
   it("keeps cross-method summary counts consistent", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-consistency-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.appendBatch([
       {
         id: "evt-goal-1",
