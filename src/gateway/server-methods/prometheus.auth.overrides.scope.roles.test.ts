@@ -8,6 +8,18 @@ import {
   runPrometheusRoleRequest,
 } from "./prometheus.request-test-helpers.js";
 
+const PLANNED_METHOD = "prometheus.control.execute";
+
+function createPlannedMethodDispatchHarness(prefix: string) {
+  return {
+    plannedExecuteHandler: vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    }),
+    authOverrides: createThrowingPrometheusAuthOverrides(prefix),
+    respond: vi.fn(),
+  };
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
 });
@@ -19,7 +31,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
     await runPrometheusNodeRequest({
       request: {
         id: "node-role-auth-override-short-circuit",
-        method: "prometheus.control.execute",
+        method: PLANNED_METHOD,
         params: {},
       },
       respond,
@@ -41,22 +53,18 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
   });
 
   it("does not dispatch planned-method extra handlers when node role is denied", async () => {
-    const method = "prometheus.control.execute";
-    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("node role");
-    const respond = vi.fn();
+    const { plannedExecuteHandler, authOverrides, respond } =
+      createPlannedMethodDispatchHarness("node role");
     await runPrometheusNodeRequest({
       request: {
         id: "node-role-planned-method-extra-handler-short-circuit",
-        method,
+        method: PLANNED_METHOD,
         params: {},
       },
       respond,
       authOverrides,
       extraHandlers: {
-        [method]: plannedExecuteHandler,
+        [PLANNED_METHOD]: plannedExecuteHandler,
       },
     });
 
@@ -69,23 +77,19 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
   });
 
   it("does not dispatch extra handlers when non-operator/non-node role is denied", async () => {
-    const method = "prometheus.control.execute";
-    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("non-operator role");
-    const respond = vi.fn();
+    const { plannedExecuteHandler, authOverrides, respond } =
+      createPlannedMethodDispatchHarness("non-operator role");
     await runPrometheusRoleRequest({
       role: "auditor",
       request: {
         id: "non-operator-role-planned-method-extra-handler-short-circuit",
-        method,
+        method: PLANNED_METHOD,
         params: {},
       },
       respond,
       authOverrides,
       extraHandlers: {
-        [method]: plannedExecuteHandler,
+        [PLANNED_METHOD]: plannedExecuteHandler,
       },
     });
 
@@ -98,23 +102,19 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
   });
 
   it("does not dispatch extra handlers when runtime role value is malformed", async () => {
-    const method = "prometheus.control.execute";
-    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("malformed role");
-    const respond = vi.fn();
+    const { plannedExecuteHandler, authOverrides, respond } =
+      createPlannedMethodDispatchHarness("malformed role");
     await runPrometheusRoleRequest({
       role: 7 as never,
       request: {
         id: "malformed-role-planned-method-extra-handler-short-circuit",
-        method,
+        method: PLANNED_METHOD,
         params: {},
       },
       respond,
       authOverrides,
       extraHandlers: {
-        [method]: plannedExecuteHandler,
+        [PLANNED_METHOD]: plannedExecuteHandler,
       },
     });
 
