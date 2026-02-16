@@ -70,6 +70,17 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toBeUndefined();
   });
 
+  it("propagates mutating metadata resolver exceptions to caller", () => {
+    expect(() =>
+      getPrometheusMutatingControlGuardError({
+        method: "prometheus.status",
+        resolveMethodMetadata: () => {
+          throw new Error("mutating metadata resolver exploded");
+        },
+      }),
+    ).toThrow("mutating metadata resolver exploded");
+  });
+
   it("returns UNAVAILABLE for planned mutating methods when env guard is disabled", () => {
     const preflight = buildPrometheusPlannedMutatingMethodPreflight({
       method: "prometheus.control.execute",
@@ -261,6 +272,17 @@ describe("PROMETHEUS mutating-control guard", () => {
         }) as never,
     });
     expect(error).toBeUndefined();
+  });
+
+  it("propagates planned metadata resolver exceptions to caller", () => {
+    expect(() =>
+      getPrometheusPlannedMutatingMethodGuardError({
+        method: "prometheus.control.execute",
+        resolvePlannedMethodMetadata: () => {
+          throw new Error("planned metadata resolver exploded");
+        },
+      }),
+    ).toThrow("planned metadata resolver exploded");
   });
 
   it("does not block methods outside planned mutating metadata", () => {
