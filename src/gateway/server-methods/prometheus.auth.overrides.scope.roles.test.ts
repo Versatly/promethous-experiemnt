@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createThrowingPrometheusAuthOverrides,
-  expectNoPrometheusAuthOverrideInvocations,
+  expectPrometheusAuthShortCircuitBeforeDispatch,
 } from "./prometheus.auth.overrides.scope.test-helpers.js";
 import {
   runPrometheusNodeRequest,
@@ -33,7 +33,11 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
         message: expect.stringContaining("unauthorized role: node"),
       }),
     );
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectPrometheusAuthShortCircuitBeforeDispatch({
+      respond,
+      authOverrides,
+      expectedMessage: "unauthorized role: node",
+    });
   });
 
   it("does not dispatch planned-method extra handlers when node role is denied", async () => {
@@ -56,15 +60,12 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
       },
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("unauthorized role: node"),
-      }),
-    );
-    expect(plannedExecuteHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectPrometheusAuthShortCircuitBeforeDispatch({
+      respond,
+      handler: plannedExecuteHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: node",
+    });
   });
 
   it("does not dispatch extra handlers when non-operator/non-node role is denied", async () => {
@@ -88,15 +89,12 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
       },
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("unauthorized role: auditor"),
-      }),
-    );
-    expect(plannedExecuteHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectPrometheusAuthShortCircuitBeforeDispatch({
+      respond,
+      handler: plannedExecuteHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: auditor",
+    });
   });
 
   it("does not dispatch extra handlers when runtime role value is malformed", async () => {
@@ -120,14 +118,11 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
       },
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("unauthorized role: 7"),
-      }),
-    );
-    expect(plannedExecuteHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectPrometheusAuthShortCircuitBeforeDispatch({
+      respond,
+      handler: plannedExecuteHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: 7",
+    });
   });
 });

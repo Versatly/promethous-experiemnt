@@ -24,3 +24,22 @@ export function expectNoPrometheusAuthOverrideInvocations(
   expect(overrides.resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
   expect(overrides.resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
 }
+
+export function expectPrometheusAuthShortCircuitBeforeDispatch(args: {
+  respond: ReturnType<typeof vi.fn>;
+  handler?: ReturnType<typeof vi.fn>;
+  authOverrides: ReturnType<typeof createThrowingPrometheusAuthOverrides>;
+  expectedMessage: string;
+}) {
+  expect(args.respond).toHaveBeenCalledWith(
+    false,
+    undefined,
+    expect.objectContaining({
+      message: expect.stringContaining(args.expectedMessage),
+    }),
+  );
+  if (args.handler) {
+    expect(args.handler).not.toHaveBeenCalled();
+  }
+  expectNoPrometheusAuthOverrideInvocations(args.authOverrides);
+}

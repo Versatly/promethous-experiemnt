@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createThrowingPrometheusAuthOverrides,
   expectNoPrometheusAuthOverrideInvocations,
+  expectPrometheusAuthShortCircuitBeforeDispatch,
 } from "./prometheus.auth.overrides.scope.test-helpers.js";
 import {
   runPrometheusNodeRequest,
@@ -19,23 +20,6 @@ function createUnknownMethodDispatchHarness(prefix: string) {
     authOverrides: createThrowingPrometheusAuthOverrides(prefix),
     respond: vi.fn(),
   };
-}
-
-function expectUnknownMethodDeniedBeforeDispatch(args: {
-  respond: ReturnType<typeof vi.fn>;
-  unknownMethodHandler: ReturnType<typeof vi.fn>;
-  authOverrides: ReturnType<typeof createThrowingPrometheusAuthOverrides>;
-  expectedMessage: string;
-}) {
-  expect(args.respond).toHaveBeenCalledWith(
-    false,
-    undefined,
-    expect.objectContaining({
-      message: expect.stringContaining(args.expectedMessage),
-    }),
-  );
-  expect(args.unknownMethodHandler).not.toHaveBeenCalled();
-  expectNoPrometheusAuthOverrideInvocations(args.authOverrides);
 }
 
 afterEach(() => {
@@ -85,9 +69,9 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       },
     });
 
-    expectUnknownMethodDeniedBeforeDispatch({
+    expectPrometheusAuthShortCircuitBeforeDispatch({
       respond,
-      unknownMethodHandler,
+      handler: unknownMethodHandler,
       authOverrides,
       expectedMessage: "missing scope: operator.admin",
     });
@@ -135,9 +119,9 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expectUnknownMethodDeniedBeforeDispatch({
+    expectPrometheusAuthShortCircuitBeforeDispatch({
       respond,
-      unknownMethodHandler,
+      handler: unknownMethodHandler,
       authOverrides,
       expectedMessage: "unauthorized role: node",
     });
@@ -161,9 +145,9 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expectUnknownMethodDeniedBeforeDispatch({
+    expectPrometheusAuthShortCircuitBeforeDispatch({
       respond,
-      unknownMethodHandler,
+      handler: unknownMethodHandler,
       authOverrides,
       expectedMessage: "unauthorized role: node",
     });
@@ -187,9 +171,9 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expectUnknownMethodDeniedBeforeDispatch({
+    expectPrometheusAuthShortCircuitBeforeDispatch({
       respond,
-      unknownMethodHandler,
+      handler: unknownMethodHandler,
       authOverrides,
       expectedMessage: "unauthorized role: auditor",
     });
@@ -212,9 +196,9 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expectUnknownMethodDeniedBeforeDispatch({
+    expectPrometheusAuthShortCircuitBeforeDispatch({
       respond,
-      unknownMethodHandler,
+      handler: unknownMethodHandler,
       authOverrides,
       expectedMessage: "unauthorized role: 7",
     });
