@@ -11,13 +11,53 @@ import {
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
 import { createPrometheusHandlers } from "./prometheus.js";
-import { runPrometheusReadRequest } from "./prometheus.request-test-helpers.js";
+import {
+  runPrometheusNodeRequest,
+  runPrometheusReadRequest,
+} from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
 describe("PROMETHEUS gateway authorization override invocation scope", () => {
+  it("does not invoke PROMETHEUS auth overrides when role short-circuit denies node clients", async () => {
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not be called for node role");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not be called for node role");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not be called for node role");
+    });
+    const respond = vi.fn();
+    await runPrometheusNodeRequest({
+      request: {
+        id: "node-role-auth-override-short-circuit",
+        method: "prometheus.control.execute",
+        params: {},
+      },
+      respond,
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: node"),
+      }),
+    );
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
   it("does not invoke PROMETHEUS auth override resolvers for non-prometheus methods", async () => {
     const resolvePrometheusMethodMetadata = vi.fn(() => {
       throw new Error("method metadata resolver should not be called");
