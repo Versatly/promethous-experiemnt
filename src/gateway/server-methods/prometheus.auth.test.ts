@@ -389,6 +389,50 @@ describe("PROMETHEUS gateway authorization", () => {
     );
   });
 
+  it("keeps planned-method canonical preflight at request handling when resolver returns divergent valid preflight", async () => {
+    const method = "prometheus.control.execute";
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-divergent-preflight-request-level",
+        method,
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodPreflight: () => ({
+          disabledMessage: "DIVERGENT disabled message",
+          notImplementedMessage: "DIVERGENT not implemented message",
+          requiredParamsMessage: "DIVERGENT required params message",
+        }),
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
+
   it("keeps planned-method UNAVAILABLE fallback at request handling when metadata resolver returns malformed shape", async () => {
     const method = "prometheus.control.execute";
     const metadata = getPrometheusPlannedMutatingMethodMetadata(method);

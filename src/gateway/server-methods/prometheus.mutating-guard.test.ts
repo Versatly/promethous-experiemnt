@@ -170,6 +170,37 @@ describe("PROMETHEUS mutating-control guard", () => {
     );
   });
 
+  it("falls back to canonical preflight when resolver returns divergent valid preflight", () => {
+    const metadata = {
+      access: "write" as const,
+      mutatesState: true as const,
+      enabled: false as const,
+      enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+      requiredParams: ["action"],
+      reason: "planned rollout",
+    };
+    const canonicalPreflight = buildPrometheusPlannedMutatingMethodPreflight({
+      method: "prometheus.control.execute",
+      metadata,
+    });
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.control.execute",
+      env: {},
+      resolvePlannedMethodPreflight: () => ({
+        disabledMessage: "DIVERGENT disabled message",
+        notImplementedMessage: "DIVERGENT not implemented message",
+        requiredParamsMessage: "DIVERGENT required params message",
+      }),
+      resolvePlannedMethodMetadata: () => metadata,
+    });
+    expect(error).toEqual(
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: canonicalPreflight.disabledMessage,
+      }),
+    );
+  });
+
   it("falls back to canonical metadata when planned metadata resolver returns malformed shape", () => {
     const metadata = getPrometheusPlannedMutatingMethodMetadata("prometheus.control.execute");
     expect(metadata).toBeDefined();

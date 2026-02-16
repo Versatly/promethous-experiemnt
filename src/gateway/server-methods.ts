@@ -173,6 +173,17 @@ function isPrometheusPlannedMutatingMethodPreflightShape(
   );
 }
 
+function isPrometheusPlannedMutatingMethodPreflightEquivalent(
+  left: PrometheusPlannedMutatingMethodPreflight,
+  right: PrometheusPlannedMutatingMethodPreflight,
+): boolean {
+  return (
+    left.disabledMessage === right.disabledMessage &&
+    left.notImplementedMessage === right.notImplementedMessage &&
+    left.requiredParamsMessage === right.requiredParamsMessage
+  );
+}
+
 function mutatingControlsDisabledError() {
   return errorShape(
     ErrorCodes.UNAVAILABLE,
@@ -247,19 +258,25 @@ export function getPrometheusPlannedMutatingMethodGuardError(args: {
   const resolvedPreflight = resolvePlannedMethodPreflight(method);
   const preflight = isPrometheusPlannedMutatingMethodPreflightShape(resolvedPreflight)
     ? resolvedPreflight
-    : canonicalPreflight;
-  if (!preflight && !effectiveMetadata) {
+    : undefined;
+  const effectivePreflight =
+    canonicalPreflight && preflight
+      ? isPrometheusPlannedMutatingMethodPreflightEquivalent(preflight, canonicalPreflight)
+        ? preflight
+        : canonicalPreflight
+      : (preflight ?? canonicalPreflight);
+  if (!effectivePreflight && !effectiveMetadata) {
     return undefined;
   }
-  const effectivePreflight =
-    preflight ??
+  const resolvedEffectivePreflight =
+    effectivePreflight ??
     buildPrometheusPlannedMutatingMethodPreflight({
       method,
       metadata: effectiveMetadata,
     });
   return arePrometheusMutatingControlsEnabled(env)
-    ? errorShape(ErrorCodes.UNAVAILABLE, effectivePreflight.notImplementedMessage)
-    : errorShape(ErrorCodes.UNAVAILABLE, effectivePreflight.disabledMessage);
+    ? errorShape(ErrorCodes.UNAVAILABLE, resolvedEffectivePreflight.notImplementedMessage)
+    : errorShape(ErrorCodes.UNAVAILABLE, resolvedEffectivePreflight.disabledMessage);
 }
 
 function authorizeGatewayMethod(
