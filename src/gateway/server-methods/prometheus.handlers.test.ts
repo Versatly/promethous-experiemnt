@@ -667,6 +667,7 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
               mutatesState: true,
               enabled: false,
               enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+              requiredParams: ["action"],
               preflight: {
                 disabledMessage: formatPlannedMutatingMethodDisabledMessage(
                   "prometheus.control.execute",

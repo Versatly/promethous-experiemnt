@@ -43,6 +43,7 @@ export type PrometheusControlCatalogSnapshot = {
       mutatesState: boolean;
       enabled: boolean;
       enableEnvVar: string;
+      requiredParams: readonly string[];
       reason: string;
       preflight: {
         disabledMessage: string;

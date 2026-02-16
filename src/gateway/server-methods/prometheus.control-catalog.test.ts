@@ -84,6 +84,8 @@ describe("prometheus control catalog builder", () => {
     expect(
       snapshot.guardrails.plannedMutatingMethods.every(
         (method) =>
+          method.requiredParams.join(",") ===
+            PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method.method]?.requiredParams.join(",") &&
           method.preflight.disabledMessage ===
             formatPlannedMutatingMethodDisabledMessage(method.method, method.enableEnvVar) &&
           method.preflight.notImplementedMessage ===
@@ -99,5 +101,25 @@ describe("prometheus control catalog builder", () => {
             formatPlannedMutatingActionNotImplementedMessage(action.action),
       ),
     ).toBe(true);
+  });
+
+  it("keeps planned mutating method required params usable for future contract validation", () => {
+    const snapshot = buildPrometheusControlCatalogSnapshot({ env: {} });
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.every(
+        (method) =>
+          method.requiredParams.length > 0 &&
+          new Set(method.requiredParams).size === method.requiredParams.length,
+      ),
+    ).toBe(true);
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.find(
+        (method) => method.method === "prometheus.control.execute",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        requiredParams: ["action"],
+      }),
+    );
   });
 });

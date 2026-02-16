@@ -60,6 +60,7 @@ describe("PROMETHEUS mutating-control guard", () => {
         mutatesState: true,
         enabled: false,
         enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        requiredParams: ["action"],
         reason: "planned rollout",
       }),
     });
@@ -83,6 +84,7 @@ describe("PROMETHEUS mutating-control guard", () => {
         mutatesState: true,
         enabled: false,
         enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        requiredParams: ["action"],
         reason: "planned rollout",
       }),
     });

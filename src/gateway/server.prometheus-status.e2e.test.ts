@@ -713,6 +713,7 @@ describe("gateway prometheus.status", () => {
             mutatesState?: boolean;
             enabled?: boolean;
             enableEnvVar?: string;
+            requiredParams?: string[];
           }>;
           plannedMutatingPreviewActions?: Array<{
             action?: string;
@@ -790,6 +791,7 @@ describe("gateway prometheus.status", () => {
             mutatesState: true,
             enabled: false,
             enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            requiredParams: ["action"],
             preflight: {
               disabledMessage: formatPlannedMutatingMethodDisabledMessage(
                 "prometheus.control.execute",

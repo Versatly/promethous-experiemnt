@@ -35,6 +35,7 @@ export type PrometheusPlannedMutatingMethodMetadata = {
   mutatesState: true;
   enabled: false;
   enableEnvVar: typeof PROMETHEUS_MUTATING_CONTROLS_ENV;
+  requiredParams: readonly string[];
   reason: string;
 };
 
@@ -82,6 +83,7 @@ export const PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA = {
     mutatesState: true,
     enabled: false,
     enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    requiredParams: ["action"],
     reason: "Reserved for future state-mutating control command execution.",
   },
   "prometheus.control.autarch.commit": {
@@ -89,6 +91,7 @@ export const PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA = {
     mutatesState: true,
     enabled: false,
     enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    requiredParams: ["goalId"],
     reason: "Reserved for AUTARCH capability-gap commit flow.",
   },
   "prometheus.control.recursion.commit": {
@@ -96,6 +99,7 @@ export const PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA = {
     mutatesState: true,
     enabled: false,
     enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    requiredParams: ["proposal", "baseline", "candidate"],
     reason: "Reserved for recursion cycle commit flow.",
   },
 } as const satisfies Record<string, PrometheusPlannedMutatingMethodMetadata>;
@@ -208,6 +212,12 @@ export function assertPrometheusPlannedMutatingMethodContract(args: {
     if (metadata.enableEnvVar !== PROMETHEUS_MUTATING_CONTROLS_ENV) {
       throw new Error(
         `PROMETHEUS planned method contract mismatch: ${method} has invalid env guard`,
+      );
+    }
+    const params = [...metadata.requiredParams];
+    if (params.some((param) => param.length === 0) || new Set(params).size !== params.length) {
+      throw new Error(
+        `PROMETHEUS planned method contract mismatch: ${method} has invalid required params`,
       );
     }
   }

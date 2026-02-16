@@ -262,6 +262,7 @@ describe("prometheus adapter summary consistency", () => {
           mutatesState: boolean;
           enabled: boolean;
           enableEnvVar: string;
+          requiredParams: string[];
           preflight: {
             disabledMessage: string;
             notImplementedMessage: string;
@@ -344,6 +345,7 @@ describe("prometheus adapter summary consistency", () => {
           mutatesState: true,
           enabled: false,
           enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+          requiredParams: ["action"],
           preflight: {
             disabledMessage: formatPlannedMutatingMethodDisabledMessage(
               "prometheus.control.execute",

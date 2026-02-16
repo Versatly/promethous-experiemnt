@@ -108,6 +108,8 @@ These methods are intentionally scoped to telemetry and read models. They do not
     - each planned mutating method/action entry includes `preflight.disabledMessage` and
       `preflight.notImplementedMessage` so operators can preview exact guard responses before
       rollout
+    - planned mutating **method** entries also include `requiredParams` for metadata-driven
+      preflight contract rollout planning
   - `methods`
   - `controlPreview`
 - `prometheus.goals`:

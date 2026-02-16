@@ -114,11 +114,30 @@ describe("PROMETHEUS method access map", () => {
             mutatesState: true,
             enabled: false,
             enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            requiredParams: ["action"],
             reason: "invalid overlap",
           },
         },
       }),
     ).toThrow("overlaps active methods");
+  });
+
+  it("fails fast when planned mutating required params are malformed", () => {
+    expect(() =>
+      assertPrometheusPlannedMutatingMethodContract({
+        activeMethods: [],
+        plannedMutatingMethodMetadata: {
+          "prometheus.control.execute": {
+            access: "write",
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            requiredParams: ["action", "action"],
+            reason: "invalid duplicated params",
+          },
+        },
+      }),
+    ).toThrow("invalid required params");
   });
 
   it("only enables mutating controls when env var is set to 1", () => {
@@ -145,6 +164,7 @@ describe("PROMETHEUS method access map", () => {
         access: "write",
         mutatesState: true,
         enabled: false,
+        requiredParams: ["action"],
       }),
     );
     expect(getPrometheusPlannedMutatingMethodMetadata("prometheus.status")).toBeUndefined();
