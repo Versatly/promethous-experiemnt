@@ -1,0 +1,77 @@
+---
+summary: "PROMETHEUS rebuild architecture contract and migration invariants"
+read_when:
+  - Working on PROMETHEUS, HELIOS, AUTARCH, or MONOLITH modules
+  - Defining compatibility boundaries during the rebuild
+title: "PROMETHEUS Architecture Contract"
+---
+
+# PROMETHEUS architecture contract
+
+This document defines the architecture contract for the PROMETHEUS rebuild program:
+
+- **PROMETHEUS**: recursive meta-controller
+- **HELIOS**: teleological coherence subsystem
+- **AUTARCH**: endogenous capability synthesis subsystem
+- **MONOLITH**: institution and capital substrate
+
+## Primitive model
+
+PROMETHEUS is built around these first-class primitives:
+
+1. Goal primitive
+2. Agent primitive
+3. State space primitive
+4. Feedback primitive
+5. Capital primitive
+6. Institution primitive
+7. Synthesis operator
+8. Recursion operator
+
+All primitives must be:
+
+- strictly typed
+- event-addressable
+- persisted in append-only history
+- reconstructable by deterministic replay
+- validated by invariant checks.
+
+## Core invariants
+
+The rebuild must preserve these non-negotiable invariants:
+
+1. **Teleological anchor:** terminal objective state survives restarts and migrations.
+2. **Trajectory integrity:** objective decomposition lineage cannot be broken silently.
+3. **Synthesis traceability:** every synthesized capability must reference a gap.
+4. **Institution authority coherence:** institution transitions must obey lifecycle rules.
+5. **Capital consistency:** capital allocations always reference a valid institution.
+6. **Recursion safety:** recursive strategy changes require policy checks and rollback path.
+7. **Alignment guardrails:** divergence and incentive incoherence must be detectable.
+
+## Compatibility contract during migration
+
+PROMETHEUS is introduced with a strangler architecture. During migration:
+
+- existing gateway protocol surfaces remain operational
+- existing channel and extension integrations remain operational
+- existing CLI and app flows remain operational
+- adapter layers may route legacy operations into PROMETHEUS internals.
+
+Cutover can happen only when parity criteria are met for:
+
+- gateway method compatibility
+- session continuity behavior
+- channel send and receive reliability
+- policy and approval enforcement semantics.
+
+## Scope boundaries
+
+The initial PROMETHEUS implementation in this repository focuses on:
+
+- primitive schemas
+- event model
+- deterministic state replay
+- invariant enforcement
+- file-backed append-only event log.
+
+Institutional automation and real-world capital execution remain policy-gated by default.
