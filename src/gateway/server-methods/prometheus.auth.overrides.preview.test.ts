@@ -14,6 +14,43 @@ afterEach(() => {
 });
 
 describe("PROMETHEUS gateway authorization override regressions (control preview)", () => {
+  it("does not invoke injected Prometheus preview dependencies for non-prometheus request methods", async () => {
+    const runControlPreview = vi.fn(async () => {
+      throw new Error("preview dependency should not be called");
+    });
+    const buildControlCatalogSnapshot = vi.fn(() => {
+      throw new Error("catalog dependency should not be called");
+    });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "non-prometheus-extra-handler-short-circuit",
+        method: "status",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview,
+        buildControlCatalogSnapshot,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalled();
+    const [ok] = respond.mock.calls[0] as [boolean, unknown, unknown];
+    expect(ok).toBe(true);
+    expect(runControlPreview).not.toHaveBeenCalled();
+    expect(buildControlCatalogSnapshot).not.toHaveBeenCalled();
+  });
+
   it("returns UNAVAILABLE when injected preview dependency violates bounded AUTARCH invariants at request level", async () => {
     const respond = vi.fn();
     await handleGatewayRequest({
