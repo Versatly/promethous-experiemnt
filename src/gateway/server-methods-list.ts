@@ -1,4 +1,5 @@
 import { listChannelPlugins } from "../channels/plugins/index.js";
+import { PROMETHEUS_GATEWAY_READ_METHODS } from "./server-methods/prometheus-methods.js";
 
 const BASE_METHODS = [
   "health",
@@ -6,12 +7,7 @@ const BASE_METHODS = [
   "channels.status",
   "channels.logout",
   "status",
-  "prometheus.status",
-  "prometheus.trajectory",
-  "prometheus.goals",
-  "prometheus.recursion",
-  "prometheus.autarch",
-  "prometheus.monolith",
+  ...PROMETHEUS_GATEWAY_READ_METHODS,
   "usage.status",
   "usage.cost",
   "tts.status",

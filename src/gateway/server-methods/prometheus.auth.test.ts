@@ -2,15 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { listGatewayMethods } from "../server-methods-list.js";
 import { handleGatewayRequest } from "../server-methods.js";
+import { PROMETHEUS_GATEWAY_READ_METHODS } from "./prometheus-methods.js";
 
-const READ_METHODS = [
-  "prometheus.status",
-  "prometheus.trajectory",
-  "prometheus.goals",
-  "prometheus.recursion",
-  "prometheus.autarch",
-  "prometheus.monolith",
-] as const;
+const READ_METHODS = PROMETHEUS_GATEWAY_READ_METHODS;
 
 describe("PROMETHEUS gateway authorization", () => {
   it("covers every prometheus.* method exposed in gateway method list", () => {

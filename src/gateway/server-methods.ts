@@ -14,6 +14,7 @@ import { healthHandlers } from "./server-methods/health.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
+import { PROMETHEUS_GATEWAY_READ_METHODS } from "./server-methods/prometheus-methods.js";
 import { prometheusHandlers } from "./server-methods/prometheus.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
@@ -79,12 +80,7 @@ const READ_METHODS = new Set([
   "chat.history",
   "config.get",
   "talk.config",
-  "prometheus.status",
-  "prometheus.trajectory",
-  "prometheus.goals",
-  "prometheus.recursion",
-  "prometheus.autarch",
-  "prometheus.monolith",
+  ...PROMETHEUS_GATEWAY_READ_METHODS,
 ]);
 const WRITE_METHODS = new Set([
   "send",
