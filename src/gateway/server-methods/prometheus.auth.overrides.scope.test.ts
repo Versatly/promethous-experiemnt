@@ -183,6 +183,46 @@ describe("PROMETHEUS gateway authorization override invocation scope", () => {
     expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
   });
 
+  it("dispatches injected unknown handlers under admin scope without invoking PROMETHEUS auth overrides", async () => {
+    const method = "prometheus.unknown.gateway.method";
+    const unknownMethodHandler = vi.fn(async ({ respond }) => {
+      respond(true, { deliveredByExtraHandler: true }, undefined);
+    });
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not run for unknown admin method");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not run for unknown admin method");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not run for unknown admin method");
+    });
+    const respond = vi.fn();
+    await runPrometheusOperatorRequest({
+      request: {
+        id: "unknown-prometheus-method-admin-extra-handler-dispatch",
+        method,
+        params: {},
+      },
+      respond,
+      scopes: ["operator.admin"],
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+      extraHandlers: {
+        [method]: unknownMethodHandler,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(true, { deliveredByExtraHandler: true }, undefined);
+    expect(unknownMethodHandler).toHaveBeenCalledTimes(1);
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
   it("invokes planned catalog resolvers for canonical planned method/action keys at request level", async () => {
     const plannedMethodKeys = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted();
     const plannedActionKeys = Object.keys(
