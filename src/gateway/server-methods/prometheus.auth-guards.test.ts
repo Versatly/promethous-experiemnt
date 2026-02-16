@@ -22,6 +22,21 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toBeUndefined();
   });
 
+  it("invokes method metadata resolver for canonical Prometheus methods", () => {
+    const resolveMethodMetadata = vi.fn(() => ({
+      access: "read" as const,
+      mutatesState: false,
+    }));
+    const error = getPrometheusMutatingControlGuardError({
+      method: "prometheus.status",
+      env: {},
+      resolveMethodMetadata,
+    });
+    expect(error).toBeUndefined();
+    expect(resolveMethodMetadata).toHaveBeenCalledTimes(1);
+    expect(resolveMethodMetadata).toHaveBeenCalledWith("prometheus.status");
+  });
+
   it("ignores mutating overrides when method is outside canonical metadata", () => {
     const error = getPrometheusMutatingControlGuardError({
       method: "prometheus.control.execute",
