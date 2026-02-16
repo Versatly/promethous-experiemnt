@@ -4,6 +4,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
+import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./prometheus-methods.js";
+import {
+  PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
+  PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+} from "./prometheus.control-preview.js";
 import { prometheusHandlers } from "./prometheus.js";
 
 const cleanupDirs = new Set<string>();
@@ -211,5 +216,52 @@ describe("prometheus adapter summary consistency", () => {
         monolithPayload.summary.dissolvedInstitutions,
     ).toBe(monolithPayload.summary.institutions);
     expect(statusPayload.summary.capitalAllocations).toBe(2);
+  });
+
+  it("keeps control catalog response aligned with method/action metadata", async () => {
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.catalog"]({
+      req: { type: "req", id: "control-catalog", method: "prometheus.control.catalog" },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(true, expect.any(Object), undefined);
+    const payload = respond.mock.calls[0]?.[1] as {
+      methods: Array<{ method: string; access: string; mutatesState: boolean }>;
+      controlPreview: {
+        method: string;
+        actions: Array<{
+          action: string;
+          mutatesState: boolean;
+          requiredParams: string[];
+        }>;
+      };
+    };
+    const methodMapFromCatalog = Object.fromEntries(
+      payload.methods.map((methodEntry) => [
+        methodEntry.method,
+        {
+          access: methodEntry.access,
+          mutatesState: methodEntry.mutatesState,
+        },
+      ]),
+    );
+    expect(methodMapFromCatalog).toEqual(PROMETHEUS_GATEWAY_METHOD_METADATA);
+    expect(payload.controlPreview.method).toBe("prometheus.control.preview");
+    expect(payload.controlPreview.actions).toHaveLength(PROMETHEUS_CONTROL_PREVIEW_ACTIONS.length);
+
+    for (const action of PROMETHEUS_CONTROL_PREVIEW_ACTIONS) {
+      expect(payload.controlPreview.actions).toContainEqual(
+        expect.objectContaining({
+          action,
+          mutatesState: PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action].mutatesState,
+          requiredParams: [...PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action].requiredParams],
+        }),
+      );
+    }
   });
 });
