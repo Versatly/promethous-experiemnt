@@ -1,6 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import {
   getPrometheusPlannedMutatingMethodMetadata,
   getPrometheusPlannedMutatingMethodPreflight,
@@ -13,6 +11,7 @@ import {
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
 import { createPrometheusHandlers } from "./prometheus.js";
+import { runPrometheusReadRequest } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -30,22 +29,13 @@ describe("PROMETHEUS gateway authorization override invocation scope", () => {
       throw new Error("planned preflight resolver should not be called");
     });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: "non-prometheus-auth-override-short-circuit",
         method: "status",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusMethodMetadata,
         resolvePrometheusPlannedMethodMetadata,
@@ -80,22 +70,13 @@ describe("PROMETHEUS gateway authorization override invocation scope", () => {
     );
 
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: "catalog-planned-resolver-invocation-request-level",
         method: "prometheus.control.catalog",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         buildControlCatalogSnapshot: () =>
           buildPrometheusControlCatalogSnapshot({

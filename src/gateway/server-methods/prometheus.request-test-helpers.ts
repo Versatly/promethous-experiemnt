@@ -37,3 +37,12 @@ export async function runPrometheusWriteRequest(
 ) {
   await runPrometheusOperatorRequest(args);
 }
+
+export async function runPrometheusReadRequest(
+  args: Omit<PrometheusOperatorRequestArgs, "scopes">,
+) {
+  await runPrometheusOperatorRequest({
+    ...args,
+    scopes: ["operator.read"],
+  });
+}

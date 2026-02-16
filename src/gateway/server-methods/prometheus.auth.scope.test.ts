@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
+import {
+  runPrometheusReadRequest,
+  runPrometheusWriteRequest,
+} from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -14,22 +16,13 @@ describe("PROMETHEUS gateway authorization invocation scope", () => {
       mutatesState: true,
     }));
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: "read-metadata-diverges",
         method: "prometheus.status",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusMethodMetadata,
       },
@@ -67,24 +60,15 @@ describe("PROMETHEUS gateway authorization invocation scope", () => {
         }) as never,
     );
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-override-on-non-planned-method",
         method: "prometheus.control.preview",
         params: {
           action: "autarch.gap-detection",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusPlannedMethodMetadata,
         resolvePrometheusPlannedMethodPreflight,

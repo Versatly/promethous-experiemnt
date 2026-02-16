@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
 import { createPrometheusHandlers } from "./prometheus.js";
+import { runPrometheusReadRequest } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -11,22 +10,13 @@ afterEach(() => {
 describe("PROMETHEUS gateway authorization override regressions", () => {
   it("returns UNAVAILABLE when injected catalog dependency violates summary invariants at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: "catalog-summary-invariant-request-level",
         method: "prometheus.control.catalog",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         buildControlCatalogSnapshot: () => {
           const snapshot = buildPrometheusControlCatalogSnapshot();
@@ -53,22 +43,13 @@ describe("PROMETHEUS gateway authorization override regressions", () => {
 
   it("returns UNAVAILABLE when injected catalog dependency violates canonical method coverage at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: "catalog-method-coverage-request-level",
         method: "prometheus.control.catalog",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         buildControlCatalogSnapshot: () => {
           const snapshot = buildPrometheusControlCatalogSnapshot();
@@ -94,22 +75,13 @@ describe("PROMETHEUS gateway authorization override regressions", () => {
 
   it("returns UNAVAILABLE when injected catalog dependency diverges planned metadata contract at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: "catalog-planned-metadata-divergence-request-level",
         method: "prometheus.control.catalog",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         buildControlCatalogSnapshot: () => {
           const snapshot = buildPrometheusControlCatalogSnapshot();
@@ -144,22 +116,13 @@ describe("PROMETHEUS gateway authorization override regressions", () => {
 
   it("returns UNAVAILABLE when injected catalog dependency diverges planned preflight contract at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: "catalog-planned-preflight-divergence-request-level",
         method: "prometheus.control.catalog",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         buildControlCatalogSnapshot: () => {
           const snapshot = buildPrometheusControlCatalogSnapshot();
