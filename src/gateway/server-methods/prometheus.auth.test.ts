@@ -96,6 +96,25 @@ describe("PROMETHEUS gateway authorization", () => {
   });
 
   it("ignores planned-method auth overrides on non-planned request paths", async () => {
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(
+      () =>
+        ({
+          access: "write",
+          mutatesState: true,
+          enabled: false,
+          enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+          requiredParams: ["action"],
+          reason: "should not affect non-planned method",
+        }) as never,
+    );
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(
+      () =>
+        ({
+          disabledMessage: "should not be used",
+          notImplementedMessage: "should not be used",
+          requiredParamsMessage: "should not be used",
+        }) as never,
+    );
     const respond = vi.fn();
     await handleGatewayRequest({
       req: {
@@ -116,21 +135,8 @@ describe("PROMETHEUS gateway authorization", () => {
       respond,
       context: {} as GatewayRequestContext,
       authOverrides: {
-        resolvePrometheusPlannedMethodMetadata: () =>
-          ({
-            access: "write",
-            mutatesState: true,
-            enabled: false,
-            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
-            requiredParams: ["action"],
-            reason: "should not affect non-planned method",
-          }) as never,
-        resolvePrometheusPlannedMethodPreflight: () =>
-          ({
-            disabledMessage: "should not be used",
-            notImplementedMessage: "should not be used",
-            requiredParamsMessage: "should not be used",
-          }) as never,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
       },
     });
 
@@ -142,6 +148,8 @@ describe("PROMETHEUS gateway authorization", () => {
       }),
       undefined,
     );
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
   });
 
   it.each(READ_METHODS)("rejects missing read scope for %s", async (method) => {
