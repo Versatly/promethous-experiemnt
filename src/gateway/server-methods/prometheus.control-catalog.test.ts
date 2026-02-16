@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
+import {
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
+  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
+} from "./prometheus-methods.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
+import { PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA } from "./prometheus.control-preview.js";
 
 describe("prometheus control catalog builder", () => {
   it("builds a consistent snapshot with summary counts", () => {
@@ -46,5 +50,30 @@ describe("prometheus control catalog builder", () => {
 
     expect(plannedMethods.every((method) => !activeMethods.has(method))).toBe(true);
     expect(plannedActions.every((action) => !activeActions.has(action))).toBe(true);
+  });
+
+  it("projects planned mutating metadata entries into guardrail payloads", () => {
+    const snapshot = buildPrometheusControlCatalogSnapshot({ env: {} });
+    const plannedMethodKeys = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted();
+    const plannedActionKeys = Object.keys(
+      PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
+    ).toSorted();
+
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.map((method) => method.method).toSorted(),
+    ).toEqual(plannedMethodKeys);
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.map((action) => action.action).toSorted(),
+    ).toEqual(plannedActionKeys);
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.every(
+        (method) => method.enableEnvVar === PROMETHEUS_MUTATING_CONTROLS_ENV,
+      ),
+    ).toBe(true);
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.every(
+        (action) => action.enableEnvVar === PROMETHEUS_MUTATING_CONTROLS_ENV,
+      ),
+    ).toBe(true);
   });
 });
