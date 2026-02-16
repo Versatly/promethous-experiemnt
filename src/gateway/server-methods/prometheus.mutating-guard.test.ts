@@ -4,11 +4,10 @@ import {
   getPrometheusMutatingControlGuardError,
   getPrometheusPlannedMutatingMethodGuardError,
 } from "../server-methods.js";
-import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 import {
-  formatPlannedMutatingMethodDisabledMessage,
-  formatPlannedMutatingMethodNotImplementedMessage,
-} from "./prometheus.preflight-guards.js";
+  buildPrometheusPlannedMutatingMethodPreflight,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
+} from "./prometheus-methods.js";
 
 describe("PROMETHEUS mutating-control guard", () => {
   it("does not block non-mutating methods", () => {
@@ -52,6 +51,17 @@ describe("PROMETHEUS mutating-control guard", () => {
   });
 
   it("returns UNAVAILABLE for planned mutating methods when env guard is disabled", () => {
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({
+      method: "prometheus.control.execute",
+      metadata: {
+        access: "write",
+        mutatesState: true,
+        enabled: false,
+        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        requiredParams: ["action"],
+        reason: "planned rollout",
+      },
+    });
     const error = getPrometheusPlannedMutatingMethodGuardError({
       method: "prometheus.control.execute",
       env: {},
@@ -67,15 +77,23 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toEqual(
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: formatPlannedMutatingMethodDisabledMessage(
-          "prometheus.control.execute",
-          PROMETHEUS_MUTATING_CONTROLS_ENV,
-        ),
+        message: preflight.disabledMessage,
       }),
     );
   });
 
   it("returns UNAVAILABLE for planned mutating methods when env guard is enabled", () => {
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({
+      method: "prometheus.control.execute",
+      metadata: {
+        access: "write",
+        mutatesState: true,
+        enabled: false,
+        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        requiredParams: ["action"],
+        reason: "planned rollout",
+      },
+    });
     const error = getPrometheusPlannedMutatingMethodGuardError({
       method: "prometheus.control.execute",
       env: { [PROMETHEUS_MUTATING_CONTROLS_ENV]: "1" },
@@ -91,7 +109,7 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toEqual(
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: formatPlannedMutatingMethodNotImplementedMessage("prometheus.control.execute"),
+        message: preflight.notImplementedMessage,
       }),
     );
   });

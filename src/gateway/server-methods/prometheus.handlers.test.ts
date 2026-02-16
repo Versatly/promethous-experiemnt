@@ -19,7 +19,6 @@ import {
   getPrometheusPlannedMutatingPreviewActionMetadata,
 } from "./prometheus.control-preview.js";
 import { assertPrometheusHandlerContract, prometheusHandlers } from "./prometheus.js";
-import { formatPlannedMutatingActionDisabledMessage } from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -962,6 +961,13 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
   });
 
   it("rejects planned mutating control preview action with UNAVAILABLE", async () => {
+    const plannedActionMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(plannedActionMetadata).toBeDefined();
+    if (!plannedActionMetadata) {
+      return;
+    }
     const respond = vi.fn();
     await prometheusHandlers["prometheus.control.preview"]({
       req: { type: "req", id: "control-5", method: "prometheus.control.preview" },
@@ -980,10 +986,10 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
       undefined,
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: formatPlannedMutatingActionDisabledMessage(
-          "autarch.gap-detection.commit",
-          PROMETHEUS_MUTATING_CONTROLS_ENV,
-        ),
+        message: buildPrometheusPlannedMutatingPreviewActionPreflight({
+          action: "autarch.gap-detection.commit",
+          metadata: plannedActionMetadata,
+        }).disabledMessage,
       }),
     );
   });

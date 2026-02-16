@@ -8,18 +8,13 @@ import {
 import {
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./server-methods/prometheus-methods.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
 } from "./server-methods/prometheus.control-preview.js";
-import {
-  formatPrometheusMissingRequiredParamsMessage,
-  formatPlannedMutatingActionDisabledMessage,
-  formatPlannedMutatingActionNotImplementedMessage,
-  formatPlannedMutatingMethodDisabledMessage,
-  formatPlannedMutatingMethodNotImplementedMessage,
-} from "./server-methods/prometheus.preflight-guards.js";
+import { formatPrometheusMissingRequiredParamsMessage } from "./server-methods/prometheus.preflight-guards.js";
 import { startGatewayServerHarness, type GatewayServerHarness } from "./server.e2e-ws-harness.js";
 import { installGatewayTestHooks, onceMessage } from "./test-helpers.js";
 
@@ -1126,6 +1121,17 @@ describe("gateway prometheus.status", () => {
   });
 
   it("returns UNAVAILABLE for planned mutating control preview actions while disabled", async () => {
+    const plannedActionMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(plannedActionMetadata).toBeDefined();
+    if (!plannedActionMetadata) {
+      return;
+    }
+    const plannedActionPreflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action: "autarch.gap-detection.commit",
+      metadata: plannedActionMetadata,
+    });
     const { ws } = await harness.openClient({
       role: "operator",
       scopes: ["operator.write"],
@@ -1152,17 +1158,23 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toBe(
-      formatPlannedMutatingActionDisabledMessage(
-        "autarch.gap-detection.commit",
-        "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-      ),
-    );
+    expect(response.error?.message).toBe(plannedActionPreflight.disabledMessage);
     ws.close();
   });
 
   it("returns UNAVAILABLE not-implemented for planned mutating preview actions when env enabled", async () => {
-    vi.stubEnv("OPENCLAW_PROMETHEUS_MUTATING_CONTROLS", "1");
+    const plannedActionMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(plannedActionMetadata).toBeDefined();
+    if (!plannedActionMetadata) {
+      return;
+    }
+    const plannedActionPreflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action: "autarch.gap-detection.commit",
+      metadata: plannedActionMetadata,
+    });
+    vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
     const { ws } = await harness.openClient({
       role: "operator",
       scopes: ["operator.write"],
@@ -1189,13 +1201,22 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toBe(
-      formatPlannedMutatingActionNotImplementedMessage("autarch.gap-detection.commit"),
-    );
+    expect(response.error?.message).toBe(plannedActionPreflight.notImplementedMessage);
     ws.close();
   });
 
   it("returns UNAVAILABLE for planned mutating methods before rollout", async () => {
+    const plannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata(
+      "prometheus.control.execute",
+    );
+    expect(plannedMethodMetadata).toBeDefined();
+    if (!plannedMethodMetadata) {
+      return;
+    }
+    const plannedMethodPreflight = buildPrometheusPlannedMutatingMethodPreflight({
+      method: "prometheus.control.execute",
+      metadata: plannedMethodMetadata,
+    });
     const { ws } = await harness.openClient({
       role: "operator",
       scopes: ["operator.write"],
@@ -1219,17 +1240,23 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toBe(
-      formatPlannedMutatingMethodDisabledMessage(
-        "prometheus.control.execute",
-        "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-      ),
-    );
+    expect(response.error?.message).toBe(plannedMethodPreflight.disabledMessage);
     ws.close();
   });
 
   it("returns UNAVAILABLE not-implemented for planned mutating methods when env enabled", async () => {
-    vi.stubEnv("OPENCLAW_PROMETHEUS_MUTATING_CONTROLS", "1");
+    const plannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata(
+      "prometheus.control.execute",
+    );
+    expect(plannedMethodMetadata).toBeDefined();
+    if (!plannedMethodMetadata) {
+      return;
+    }
+    const plannedMethodPreflight = buildPrometheusPlannedMutatingMethodPreflight({
+      method: "prometheus.control.execute",
+      metadata: plannedMethodMetadata,
+    });
+    vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
     const { ws } = await harness.openClient({
       role: "operator",
       scopes: ["operator.write"],
@@ -1253,9 +1280,7 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toBe(
-      formatPlannedMutatingMethodNotImplementedMessage("prometheus.control.execute"),
-    );
+    expect(response.error?.message).toBe(plannedMethodPreflight.notImplementedMessage);
     ws.close();
   });
 

@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
-import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
-import { prometheusHandlers } from "./prometheus.js";
 import {
-  formatPrometheusMissingRequiredParamsMessage,
-  formatPlannedMutatingActionDisabledMessage,
-} from "./prometheus.preflight-guards.js";
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
+} from "./prometheus.control-preview.js";
+import { prometheusHandlers } from "./prometheus.js";
+import { formatPrometheusMissingRequiredParamsMessage } from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -203,6 +203,17 @@ describe("prometheus handler error shape parity", () => {
   });
 
   it("uses UNAVAILABLE for planned mutating preview actions before rollout", async () => {
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action: "autarch.gap-detection.commit",
+      metadata,
+    });
     const plannedActionRespond = vi.fn();
     await prometheusHandlers["prometheus.control.preview"]({
       req: { type: "req", id: "control-planned-disabled", method: "prometheus.control.preview" },
@@ -220,10 +231,7 @@ describe("prometheus handler error shape parity", () => {
       undefined,
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: formatPlannedMutatingActionDisabledMessage(
-          "autarch.gap-detection.commit",
-          PROMETHEUS_MUTATING_CONTROLS_ENV,
-        ),
+        message: preflight.disabledMessage,
       }),
     );
   });

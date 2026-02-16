@@ -3,16 +3,14 @@ import type { GatewayRequestContext } from "./types.js";
 import { listGatewayMethods } from "../server-methods-list.js";
 import { handleGatewayRequest } from "../server-methods.js";
 import {
+  buildPrometheusPlannedMutatingMethodPreflight,
+  getPrometheusPlannedMutatingMethodMetadata,
   PROMETHEUS_GATEWAY_METHODS,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
   PROMETHEUS_GATEWAY_READ_METHODS,
   PROMETHEUS_GATEWAY_WRITE_METHODS,
 } from "./prometheus-methods.js";
-import {
-  formatPlannedMutatingMethodDisabledMessage,
-  formatPlannedMutatingMethodNotImplementedMessage,
-} from "./prometheus.preflight-guards.js";
 
 const READ_METHODS = PROMETHEUS_GATEWAY_READ_METHODS;
 const WRITE_METHODS = PROMETHEUS_GATEWAY_WRITE_METHODS;
@@ -191,6 +189,12 @@ describe("PROMETHEUS gateway authorization", () => {
 
   it("returns UNAVAILABLE for planned mutating methods before rollout", async () => {
     for (const method of Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA)) {
+      const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+      expect(metadata).toBeDefined();
+      if (!metadata) {
+        continue;
+      }
+      const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
       const respond = vi.fn();
       await handleGatewayRequest({
         req: {
@@ -215,10 +219,7 @@ describe("PROMETHEUS gateway authorization", () => {
         undefined,
         expect.objectContaining({
           code: "UNAVAILABLE",
-          message: formatPlannedMutatingMethodDisabledMessage(
-            method,
-            PROMETHEUS_MUTATING_CONTROLS_ENV,
-          ),
+          message: preflight.disabledMessage,
         }),
       );
     }
@@ -227,6 +228,12 @@ describe("PROMETHEUS gateway authorization", () => {
   it("returns UNAVAILABLE not-implemented when planned methods are env-enabled", async () => {
     vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
     for (const method of Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA)) {
+      const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+      expect(metadata).toBeDefined();
+      if (!metadata) {
+        continue;
+      }
+      const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
       const respond = vi.fn();
       await handleGatewayRequest({
         req: {
@@ -251,7 +258,7 @@ describe("PROMETHEUS gateway authorization", () => {
         undefined,
         expect.objectContaining({
           code: "UNAVAILABLE",
-          message: formatPlannedMutatingMethodNotImplementedMessage(method),
+          message: preflight.notImplementedMessage,
         }),
       );
     }
