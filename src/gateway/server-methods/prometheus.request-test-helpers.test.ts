@@ -307,6 +307,32 @@ describe("prometheus request test helpers", () => {
     ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
   });
 
+  it("throws descriptive error when write helper request method is blank", async () => {
+    await expect(
+      runPrometheusWriteRequest({
+        request: {
+          id: "request-helper-invalid-blank-method-write",
+          method: "",
+          params: {},
+        },
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
+  });
+
+  it("throws descriptive error when read helper request method is blank", async () => {
+    await expect(
+      runPrometheusReadRequest({
+        request: {
+          id: "request-helper-invalid-blank-method-read",
+          method: " ",
+          params: {},
+        },
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
+  });
+
   it("throws descriptive error when node helper request method is blank", async () => {
     await expect(
       runPrometheusNodeRequest({

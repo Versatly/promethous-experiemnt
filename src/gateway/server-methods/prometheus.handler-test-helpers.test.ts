@@ -228,4 +228,16 @@ describe("prometheus handler test helpers", () => {
       }),
     ).rejects.toThrow('Missing PROMETHEUS handler for method "prometheus.control.preview"');
   });
+
+  it("throws descriptive error when catalog wrapper helper target handler is missing", async () => {
+    await expect(
+      runPrometheusControlCatalogHandler({
+        handlers: {
+          "prometheus.control.preview": async () => undefined,
+        },
+        requestId: "handler-helper-missing-catalog-wrapper",
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow('Missing PROMETHEUS handler for method "prometheus.control.catalog"');
+  });
 });
