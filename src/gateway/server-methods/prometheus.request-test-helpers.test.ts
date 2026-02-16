@@ -75,6 +75,33 @@ describe("prometheus request test helpers", () => {
     );
   });
 
+  it("forwards default node role/scopes into extra handlers", async () => {
+    const nodeEventHandler = vi.fn(async ({ client, respond }) => {
+      expect(client).toEqual({
+        connect: {
+          role: "node",
+          scopes: ["operator.read"],
+        },
+      });
+      respond(true, { ok: true }, undefined);
+    });
+    const respond = vi.fn();
+    await runPrometheusNodeRequest({
+      request: {
+        id: "request-helper-forwards-node-client",
+        method: "node.event",
+        params: {},
+      },
+      respond,
+      extraHandlers: {
+        "node.event": nodeEventHandler,
+      },
+    });
+
+    expect(nodeEventHandler).toHaveBeenCalledTimes(1);
+    expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
+  });
+
   it("applies explicit scopes for operator helper requests", async () => {
     const respond = vi.fn();
     await runPrometheusOperatorRequest({
@@ -233,6 +260,37 @@ describe("prometheus request test helpers", () => {
     });
 
     expect(statusHandler).toHaveBeenCalledTimes(1);
+    expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
+  });
+
+  it("forwards custom scopes and context for node helper requests", async () => {
+    const context = { marker: "node-helper-context" } as GatewayRequestContext;
+    const nodeEventHandler = vi.fn(async ({ client, context: receivedContext, respond }) => {
+      expect(client).toEqual({
+        connect: {
+          role: "node",
+          scopes: ["operator.write"],
+        },
+      });
+      expect(receivedContext).toBe(context);
+      respond(true, { ok: true }, undefined);
+    });
+    const respond = vi.fn();
+    await runPrometheusNodeRequest({
+      request: {
+        id: "request-helper-node-custom-scopes",
+        method: "node.event",
+        params: {},
+      },
+      respond,
+      context,
+      scopes: ["operator.write"],
+      extraHandlers: {
+        "node.event": nodeEventHandler,
+      },
+    });
+
+    expect(nodeEventHandler).toHaveBeenCalledTimes(1);
     expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
   });
 });

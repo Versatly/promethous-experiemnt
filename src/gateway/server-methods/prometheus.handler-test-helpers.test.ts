@@ -88,9 +88,31 @@ describe("prometheus handler test helpers", () => {
     expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
   });
 
+  it("uses default empty params/context for generic helper", async () => {
+    const handler = vi.fn(async ({ params, context, respond }) => {
+      expect(params).toEqual({});
+      expect(context).toEqual({});
+      respond(true, { ok: true }, undefined);
+    });
+    const handlers: GatewayRequestHandlers = {
+      "prometheus.status": handler,
+    };
+    const respond = vi.fn();
+    await runPrometheusHandler({
+      handlers,
+      method: "prometheus.status",
+      requestId: "handler-helper-generic-defaults",
+      respond,
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
+  });
+
   it("delegates control wrapper helpers to canonical method keys", async () => {
-    const catalogHandler = vi.fn(async ({ req, respond }) => {
+    const catalogHandler = vi.fn(async ({ req, params, respond }) => {
       expect(req.method).toBe("prometheus.control.catalog");
+      expect(params).toEqual({ stateDir: "/tmp/catalog-state" });
       respond(true, { method: req.method }, undefined);
     });
     const previewHandler = vi.fn(async ({ req, params, respond }) => {
@@ -107,6 +129,7 @@ describe("prometheus handler test helpers", () => {
     await runPrometheusControlCatalogHandler({
       handlers,
       requestId: "handler-helper-wrapper-catalog",
+      params: { stateDir: "/tmp/catalog-state" },
       respond: catalogRespond,
     });
     expect(catalogHandler).toHaveBeenCalledTimes(1);
