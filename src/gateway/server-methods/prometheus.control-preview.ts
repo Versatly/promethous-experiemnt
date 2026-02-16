@@ -24,6 +24,26 @@ export const PROMETHEUS_CONTROL_PREVIEW_ACTIONS = [
 
 export type PrometheusControlPreviewAction = (typeof PROMETHEUS_CONTROL_PREVIEW_ACTIONS)[number];
 
+type PrometheusControlPreviewActionMetadata = {
+  mutatesState: false;
+  requiredParams: readonly string[];
+};
+
+export const PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA = {
+  "autarch.gap-detection": {
+    mutatesState: false,
+    requiredParams: [],
+  },
+  "helios.trajectory-evaluation": {
+    mutatesState: false,
+    requiredParams: ["goalId"],
+  },
+  "recursion.mutation-evaluation": {
+    mutatesState: false,
+    requiredParams: ["proposal", "baseline", "candidate"],
+  },
+} as const satisfies Record<PrometheusControlPreviewAction, PrometheusControlPreviewActionMetadata>;
+
 type MutationFitnessSnapshotInput = {
   objectiveFit: number;
   stability: number;
@@ -119,6 +139,7 @@ export async function runPrometheusControlPreview(
     if (!isPrometheusControlPreviewAction(rawAction)) {
       return invalidRequest(`Unsupported control preview action "${rawAction}"`);
     }
+    const actionMetadata = PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[rawAction];
 
     const stateDir = resolveObserverStateDir(params);
     const eventStore = createFilePrometheusEventStore(
@@ -139,7 +160,7 @@ export async function runPrometheusControlPreview(
         payload: {
           ts: now,
           action: rawAction,
-          mutatesState: false,
+          mutatesState: actionMetadata.mutatesState,
           preview: {
             suggestedGapCount: suggestions.length,
             suggestions: suggestions.map((suggestion) => ({
@@ -183,7 +204,7 @@ export async function runPrometheusControlPreview(
         payload: {
           ts: now,
           action: rawAction,
-          mutatesState: false,
+          mutatesState: actionMetadata.mutatesState,
           preview: {
             goalId,
             goalStatus: goal.status,
@@ -241,7 +262,7 @@ export async function runPrometheusControlPreview(
       payload: {
         ts: now,
         action: rawAction,
-        mutatesState: false,
+        mutatesState: actionMetadata.mutatesState,
         preview: {
           evaluation,
         },

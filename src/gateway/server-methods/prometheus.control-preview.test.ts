@@ -8,6 +8,7 @@ import {
 } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import {
+  PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   isPrometheusControlPreviewAction,
   runPrometheusControlPreview,
@@ -39,6 +40,21 @@ describe("prometheus control preview helpers", () => {
     ]);
     expect(actions.every((action) => isPrometheusControlPreviewAction(action))).toBe(true);
     expect(isPrometheusControlPreviewAction("unknown.action")).toBe(false);
+    expect(Object.keys(PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA).toSorted()).toEqual(
+      [...actions].toSorted(),
+    );
+    for (const action of actions) {
+      expect(PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action].mutatesState).toBe(false);
+    }
+    expect(
+      PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA["autarch.gap-detection"].requiredParams,
+    ).toEqual([]);
+    expect(
+      PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA["helios.trajectory-evaluation"].requiredParams,
+    ).toEqual(["goalId"]);
+    expect(
+      PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA["recursion.mutation-evaluation"].requiredParams,
+    ).toEqual(["proposal", "baseline", "candidate"]);
   });
 
   it("returns INVALID_REQUEST for missing or unsupported actions", async () => {
