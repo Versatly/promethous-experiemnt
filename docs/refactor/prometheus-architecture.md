@@ -181,7 +181,8 @@ metadata and implemented `prometheus.*` handlers cannot silently drift.
 Future mutating control methods are additionally gated by
 `OPENCLAW_PROMETHEUS_MUTATING_CONTROLS=1`; `prometheus.control.catalog` exposes this guardrail
 state and lists any currently mutating methods/actions. Gateway authorization enforces this through
-`getPrometheusMutatingControlGuardError`.
+`getPrometheusMutatingControlGuardError`, and also publishes planned disabled-by-default mutating
+preview actions for preflight rollout checks.
 
 ## Scope boundaries
 

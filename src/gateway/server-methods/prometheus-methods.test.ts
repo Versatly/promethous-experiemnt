@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   arePrometheusMutatingControlsEnabled,
   assertPrometheusGatewayMethodMetadataContract,
+  getPrometheusGatewayMethodMetadata,
   listPrometheusMutatingMethods,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_GATEWAY_METHODS,
@@ -97,5 +98,13 @@ describe("PROMETHEUS method access map", () => {
     expect(arePrometheusMutatingControlsEnabled({ [PROMETHEUS_MUTATING_CONTROLS_ENV]: "1" })).toBe(
       true,
     );
+  });
+
+  it("resolves method metadata only for known PROMETHEUS methods", () => {
+    expect(getPrometheusGatewayMethodMetadata("prometheus.control.preview")).toEqual({
+      access: "write",
+      mutatesState: false,
+    });
+    expect(getPrometheusGatewayMethodMetadata("prometheus.unknown")).toBeUndefined();
   });
 });

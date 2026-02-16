@@ -20,7 +20,9 @@ import {
   type PrometheusGatewayMethodMetadata,
 } from "./prometheus-methods.js";
 import {
+  listPrometheusPlannedMutatingPreviewActions,
   listPrometheusMutatingPreviewActions,
+  PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
   runPrometheusControlPreview,
@@ -396,6 +398,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
       }));
       const mutatingMethods = listPrometheusMutatingMethods();
       const mutatingPreviewActions = listPrometheusMutatingPreviewActions();
+      const plannedMutatingPreviewActions = listPrometheusPlannedMutatingPreviewActions();
       const mutationsEnabled = arePrometheusMutatingControlsEnabled();
       const summary = {
         totalMethods: methods.length,
@@ -415,6 +418,10 @@ export const prometheusHandlers: GatewayRequestHandlers = {
             enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
             mutatingMethods,
             mutatingPreviewActions,
+            plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => ({
+              action,
+              ...PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA[action],
+            })),
           },
           methods,
           controlPreview: {

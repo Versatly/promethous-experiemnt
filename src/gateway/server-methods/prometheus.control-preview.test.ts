@@ -9,9 +9,12 @@ import {
 import { ErrorCodes } from "../protocol/index.js";
 import {
   assertPrometheusControlPreviewActionContract,
+  assertPrometheusPlannedMutatingPreviewActionContract,
+  listPrometheusPlannedMutatingPreviewActions,
   listPrometheusMutatingPreviewActions,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
+  PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
   isPrometheusControlPreviewAction,
   runPrometheusControlPreview,
 } from "./prometheus.control-preview.js";
@@ -58,6 +61,11 @@ describe("prometheus control preview helpers", () => {
       PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA["recursion.mutation-evaluation"].requiredParams,
     ).toEqual(["proposal", "baseline", "candidate"]);
     expect(listPrometheusMutatingPreviewActions()).toEqual([]);
+    expect(listPrometheusPlannedMutatingPreviewActions()).toEqual([
+      "autarch.gap-detection.commit",
+      "helios.trajectory-evaluation.commit",
+      "recursion.mutation-evaluation.commit",
+    ]);
   });
 
   it("returns INVALID_REQUEST for missing or unsupported actions", async () => {
@@ -288,5 +296,27 @@ describe("prometheus control preview helpers", () => {
         },
       }),
     ).toEqual(["prometheus.control.execute"]);
+  });
+
+  it("keeps planned mutating actions disjoint from active preview actions", () => {
+    expect(
+      Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA).some((action) =>
+        PROMETHEUS_CONTROL_PREVIEW_ACTIONS.includes(action as never),
+      ),
+    ).toBe(false);
+    expect(() =>
+      assertPrometheusPlannedMutatingPreviewActionContract({
+        activeActions: ["autarch.gap-detection"],
+        plannedMutatingActionMetadata: {
+          "autarch.gap-detection": {
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            requiredParams: [],
+            reason: "invalid overlap",
+          },
+        },
+      }),
+    ).toThrow("overlaps active actions");
   });
 });

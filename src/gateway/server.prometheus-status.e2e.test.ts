@@ -695,6 +695,13 @@ describe("gateway prometheus.status", () => {
           enableEnvVar?: string;
           mutatingMethods?: string[];
           mutatingPreviewActions?: string[];
+          plannedMutatingPreviewActions?: Array<{
+            action?: string;
+            mutatesState?: boolean;
+            enabled?: boolean;
+            enableEnvVar?: string;
+            requiredParams?: string[];
+          }>;
         };
         methods?: Array<{ method?: string; access?: string; mutatesState?: boolean }>;
         controlPreview?: {
@@ -755,6 +762,14 @@ describe("gateway prometheus.status", () => {
         enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
         mutatingMethods: [],
         mutatingPreviewActions: [],
+        plannedMutatingPreviewActions: expect.arrayContaining([
+          expect.objectContaining({
+            action: "autarch.gap-detection.commit",
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+          }),
+        ]),
       }),
     );
     expect(response.error).toBeUndefined();

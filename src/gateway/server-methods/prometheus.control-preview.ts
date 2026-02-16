@@ -10,6 +10,7 @@ import {
 } from "../../prometheus/index.js";
 import { type ErrorCode, ErrorCodes } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
+import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 import {
   resolveMaxItems,
   resolveObserverStateDir,
@@ -44,6 +45,38 @@ export const PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA = {
   },
 } as const satisfies Record<PrometheusControlPreviewAction, PrometheusControlPreviewActionMetadata>;
 
+type PrometheusPlannedMutatingPreviewActionMetadata = {
+  mutatesState: true;
+  enabled: false;
+  enableEnvVar: typeof PROMETHEUS_MUTATING_CONTROLS_ENV;
+  requiredParams: readonly string[];
+  reason: string;
+};
+
+export const PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA = {
+  "autarch.gap-detection.commit": {
+    mutatesState: true,
+    enabled: false,
+    enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    requiredParams: ["goalId"],
+    reason: "Reserved for future gap-event commit flow after control cutover.",
+  },
+  "helios.trajectory-evaluation.commit": {
+    mutatesState: true,
+    enabled: false,
+    enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    requiredParams: ["goalId"],
+    reason: "Reserved for future trajectory snapshot persistence flow.",
+  },
+  "recursion.mutation-evaluation.commit": {
+    mutatesState: true,
+    enabled: false,
+    enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    requiredParams: ["proposal", "baseline", "candidate"],
+    reason: "Reserved for future recursion decision commit flow.",
+  },
+} as const satisfies Record<string, PrometheusPlannedMutatingPreviewActionMetadata>;
+
 export function listPrometheusMutatingPreviewActions(
   actionMetadata: Record<
     string,
@@ -52,6 +85,18 @@ export function listPrometheusMutatingPreviewActions(
 ): string[] {
   return Object.entries(actionMetadata)
     .filter(([, metadata]) => metadata.mutatesState)
+    .map(([action]) => action)
+    .toSorted();
+}
+
+export function listPrometheusPlannedMutatingPreviewActions(
+  actionMetadata: Record<
+    string,
+    PrometheusPlannedMutatingPreviewActionMetadata
+  > = PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
+): string[] {
+  return Object.entries(actionMetadata)
+    .filter(([, metadata]) => !metadata.enabled && metadata.mutatesState)
     .map(([action]) => action)
     .toSorted();
 }
@@ -92,9 +137,50 @@ export function assertPrometheusControlPreviewActionContract(args: {
   }
 }
 
+export function assertPrometheusPlannedMutatingPreviewActionContract(args: {
+  activeActions: readonly string[];
+  plannedMutatingActionMetadata: Record<string, PrometheusPlannedMutatingPreviewActionMetadata>;
+}): void {
+  const { activeActions, plannedMutatingActionMetadata } = args;
+  const plannedActions = Object.keys(plannedMutatingActionMetadata);
+  if (new Set(plannedActions).size !== plannedActions.length) {
+    throw new Error(
+      "PROMETHEUS planned control action contract mismatch: duplicate planned actions detected",
+    );
+  }
+  for (const action of plannedActions) {
+    if (activeActions.includes(action)) {
+      throw new Error(
+        `PROMETHEUS planned control action contract mismatch: ${action} overlaps active actions`,
+      );
+    }
+    const metadata = plannedMutatingActionMetadata[action];
+    if (metadata.enabled || !metadata.mutatesState) {
+      throw new Error(
+        `PROMETHEUS planned control action contract mismatch: ${action} must be disabled mutating`,
+      );
+    }
+    if (!Array.isArray(metadata.requiredParams)) {
+      throw new Error(
+        `PROMETHEUS planned control action contract mismatch: ${action} missing required params`,
+      );
+    }
+    if (metadata.enableEnvVar !== PROMETHEUS_MUTATING_CONTROLS_ENV) {
+      throw new Error(
+        `PROMETHEUS planned control action contract mismatch: ${action} invalid env guard`,
+      );
+    }
+  }
+}
+
 assertPrometheusControlPreviewActionContract({
   actions: PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   actionMetadata: PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+});
+
+assertPrometheusPlannedMutatingPreviewActionContract({
+  activeActions: PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
+  plannedMutatingActionMetadata: PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 });
 
 type MutationFitnessSnapshotInput = {

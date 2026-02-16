@@ -244,6 +244,13 @@ describe("prometheus adapter summary consistency", () => {
         enableEnvVar: string;
         mutatingMethods: string[];
         mutatingPreviewActions: string[];
+        plannedMutatingPreviewActions: Array<{
+          action: string;
+          mutatesState: boolean;
+          enabled: boolean;
+          enableEnvVar: string;
+          requiredParams: string[];
+        }>;
       };
       methods: Array<{ method: string; access: string; mutatesState: boolean }>;
       controlPreview: {
@@ -288,6 +295,17 @@ describe("prometheus adapter summary consistency", () => {
         .filter((action) => action.mutatesState)
         .map((action) => action.action)
         .toSorted(),
+    );
+    expect(payload.guardrails.plannedMutatingPreviewActions.length).toBeGreaterThan(0);
+    expect(payload.guardrails.plannedMutatingPreviewActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "autarch.gap-detection.commit",
+          mutatesState: true,
+          enabled: false,
+          enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+        }),
+      ]),
     );
     expect(payload.guardrails.mutationsEnabled).toBe(false);
 
