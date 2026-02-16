@@ -4,6 +4,7 @@ import { listGatewayMethods } from "../server-methods-list.js";
 import { handleGatewayRequest } from "../server-methods.js";
 import {
   PROMETHEUS_GATEWAY_METHODS,
+  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
   PROMETHEUS_GATEWAY_READ_METHODS,
   PROMETHEUS_GATEWAY_WRITE_METHODS,
 } from "./prometheus-methods.js";
@@ -177,5 +178,37 @@ describe("PROMETHEUS gateway authorization", () => {
         message: expect.stringContaining("unauthorized role: node"),
       }),
     );
+  });
+
+  it("returns UNAVAILABLE for planned mutating methods before rollout", async () => {
+    for (const method of Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA)) {
+      const respond = vi.fn();
+      await handleGatewayRequest({
+        req: {
+          type: "req",
+          id: `planned-${method}`,
+          method,
+          params: {},
+        },
+        client: {
+          connect: {
+            role: "operator",
+            scopes: ["operator.write"],
+          },
+        },
+        isWebchatConnect: () => false,
+        respond,
+        context: {} as GatewayRequestContext,
+      });
+
+      expect(respond).toHaveBeenCalledWith(
+        false,
+        undefined,
+        expect.objectContaining({
+          code: "UNAVAILABLE",
+          message: expect.stringContaining(`planned mutating method "${method}" is disabled`),
+        }),
+      );
+    }
   });
 });

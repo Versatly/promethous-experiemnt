@@ -4,6 +4,7 @@ import {
   assertPrometheusGatewayMethodMetadataContract,
   assertPrometheusPlannedMutatingMethodContract,
   getPrometheusGatewayMethodMetadata,
+  getPrometheusPlannedMutatingMethodMetadata,
   listPrometheusPlannedMutatingMethods,
   listPrometheusMutatingMethods,
   PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
@@ -136,5 +137,24 @@ describe("PROMETHEUS method access map", () => {
       mutatesState: false,
     });
     expect(getPrometheusGatewayMethodMetadata("prometheus.unknown")).toBeUndefined();
+  });
+
+  it("resolves planned mutating metadata only for known planned methods", () => {
+    expect(getPrometheusPlannedMutatingMethodMetadata("prometheus.control.execute")).toEqual(
+      expect.objectContaining({
+        access: "write",
+        mutatesState: true,
+        enabled: false,
+      }),
+    );
+    expect(getPrometheusPlannedMutatingMethodMetadata("prometheus.status")).toBeUndefined();
+  });
+
+  it("exports stable planned mutating method set for rollout scaffolding", () => {
+    expect(Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted()).toEqual([
+      "prometheus.control.autarch.commit",
+      "prometheus.control.execute",
+      "prometheus.control.recursion.commit",
+    ]);
   });
 });

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ErrorCodes } from "../protocol/index.js";
-import { getPrometheusMutatingControlGuardError } from "../server-methods.js";
+import {
+  getPrometheusMutatingControlGuardError,
+  getPrometheusPlannedMutatingMethodGuardError,
+} from "../server-methods.js";
 import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 
 describe("PROMETHEUS mutating-control guard", () => {
@@ -40,6 +43,56 @@ describe("PROMETHEUS mutating-control guard", () => {
         access: "write",
         mutatesState: true,
       }),
+    });
+    expect(error).toBeUndefined();
+  });
+
+  it("returns UNAVAILABLE for planned mutating methods when env guard is disabled", () => {
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.control.execute",
+      env: {},
+      resolvePlannedMethodMetadata: () => ({
+        access: "write",
+        mutatesState: true,
+        enabled: false,
+        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        reason: "planned rollout",
+      }),
+    });
+    expect(error).toEqual(
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining(
+          'planned mutating method "prometheus.control.execute" is disabled',
+        ),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE for planned mutating methods when env guard is enabled", () => {
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.control.execute",
+      env: { [PROMETHEUS_MUTATING_CONTROLS_ENV]: "1" },
+      resolvePlannedMethodMetadata: () => ({
+        access: "write",
+        mutatesState: true,
+        enabled: false,
+        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        reason: "planned rollout",
+      }),
+    });
+    expect(error).toEqual(
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: 'planned mutating method "prometheus.control.execute" is not implemented yet',
+      }),
+    );
+  });
+
+  it("does not block methods outside planned mutating metadata", () => {
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.status",
+      resolvePlannedMethodMetadata: () => undefined,
     });
     expect(error).toBeUndefined();
   });

@@ -17,6 +17,8 @@ import { nodeHandlers } from "./server-methods/nodes.js";
 import {
   arePrometheusMutatingControlsEnabled,
   getPrometheusGatewayMethodMetadata,
+  getPrometheusPlannedMutatingMethodMetadata,
+  type PrometheusPlannedMutatingMethodMetadata,
   type PrometheusGatewayMethodMetadata,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
@@ -119,6 +121,20 @@ function mutatingControlsDisabledError() {
   );
 }
 
+function plannedMutatingMethodDisabledError(method: string) {
+  return errorShape(
+    ErrorCodes.UNAVAILABLE,
+    `planned mutating method "${method}" is disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable guardrail preflight)`,
+  );
+}
+
+function plannedMutatingMethodUnimplementedError(method: string) {
+  return errorShape(
+    ErrorCodes.UNAVAILABLE,
+    `planned mutating method "${method}" is not implemented yet`,
+  );
+}
+
 export function getPrometheusMutatingControlGuardError(args: {
   method: string;
   env?: NodeJS.ProcessEnv;
@@ -134,6 +150,27 @@ export function getPrometheusMutatingControlGuardError(args: {
     return undefined;
   }
   return arePrometheusMutatingControlsEnabled(env) ? undefined : mutatingControlsDisabledError();
+}
+
+export function getPrometheusPlannedMutatingMethodGuardError(args: {
+  method: string;
+  env?: NodeJS.ProcessEnv;
+  resolvePlannedMethodMetadata?: (
+    method: string,
+  ) => PrometheusPlannedMutatingMethodMetadata | undefined;
+}) {
+  const {
+    method,
+    env = process.env,
+    resolvePlannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata,
+  } = args;
+  const plannedMetadata = resolvePlannedMethodMetadata(method);
+  if (!plannedMetadata) {
+    return undefined;
+  }
+  return arePrometheusMutatingControlsEnabled(env)
+    ? plannedMutatingMethodUnimplementedError(method)
+    : plannedMutatingMethodDisabledError(method);
 }
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -157,6 +194,10 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   const mutatingControlGuardError = getPrometheusMutatingControlGuardError({ method });
   if (mutatingControlGuardError) {
     return mutatingControlGuardError;
+  }
+  const plannedMutatingMethodGuardError = getPrometheusPlannedMutatingMethodGuardError({ method });
+  if (plannedMutatingMethodGuardError) {
+    return plannedMutatingMethodGuardError;
   }
   if (scopes.includes(ADMIN_SCOPE)) {
     return null;

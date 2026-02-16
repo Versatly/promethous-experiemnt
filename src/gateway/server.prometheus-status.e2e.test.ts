@@ -1099,6 +1099,36 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("returns UNAVAILABLE for planned mutating methods before rollout", async () => {
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-method-planned-disabled",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-method-planned-disabled",
+        method: "prometheus.control.execute",
+        params: {},
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { code?: string; message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.code).toBe("UNAVAILABLE");
+    expect(response.error?.message).toContain(
+      'planned mutating method "prometheus.control.execute" is disabled',
+    );
+    ws.close();
+  });
+
   it("does not mutate event stream when running control preview actions", async () => {
     const stateDir = resolveStateDir();
     const eventStore = createFilePrometheusEventStore(

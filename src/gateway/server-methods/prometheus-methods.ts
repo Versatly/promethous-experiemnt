@@ -30,7 +30,7 @@ export type PrometheusGatewayMethodMetadata = {
 
 export const PROMETHEUS_MUTATING_CONTROLS_ENV = "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS";
 
-type PrometheusPlannedMutatingMethodMetadata = {
+export type PrometheusPlannedMutatingMethodMetadata = {
   access: "write";
   mutatesState: true;
   enabled: false;
@@ -122,6 +122,15 @@ export function listPrometheusPlannedMutatingMethods(
     .filter(([, metadata]) => !metadata.enabled && metadata.mutatesState)
     .map(([method]) => method)
     .toSorted();
+}
+
+export function getPrometheusPlannedMutatingMethodMetadata(
+  method: string,
+): PrometheusPlannedMutatingMethodMetadata | undefined {
+  if (!(method in PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA)) {
+    return undefined;
+  }
+  return PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method];
 }
 
 export function arePrometheusMutatingControlsEnabled(
