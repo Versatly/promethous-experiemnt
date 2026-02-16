@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   arePrometheusMutatingControlsEnabled,
   assertPrometheusGatewayMethodMetadataContract,
+  assertPrometheusPlannedMutatingMethodContract,
   getPrometheusGatewayMethodMetadata,
+  listPrometheusPlannedMutatingMethods,
   listPrometheusMutatingMethods,
+  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_GATEWAY_METHODS,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
@@ -76,6 +79,11 @@ describe("PROMETHEUS method access map", () => {
 
   it("reports mutating methods from metadata and keeps current list empty", () => {
     expect(listPrometheusMutatingMethods()).toEqual([]);
+    expect(listPrometheusPlannedMutatingMethods()).toEqual([
+      "prometheus.control.autarch.commit",
+      "prometheus.control.execute",
+      "prometheus.control.recursion.commit",
+    ]);
     expect(
       listPrometheusMutatingMethods({
         "prometheus.status": {
@@ -88,6 +96,28 @@ describe("PROMETHEUS method access map", () => {
         },
       }),
     ).toEqual(["prometheus.control.execute"]);
+  });
+
+  it("keeps planned mutating methods disjoint from active methods", () => {
+    expect(
+      Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).some((method) =>
+        PROMETHEUS_GATEWAY_METHODS.includes(method as never),
+      ),
+    ).toBe(false);
+    expect(() =>
+      assertPrometheusPlannedMutatingMethodContract({
+        activeMethods: ["prometheus.control.execute"],
+        plannedMutatingMethodMetadata: {
+          "prometheus.control.execute": {
+            access: "write",
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            reason: "invalid overlap",
+          },
+        },
+      }),
+    ).toThrow("overlaps active methods");
   });
 
   it("only enables mutating controls when env var is set to 1", () => {

@@ -30,6 +30,14 @@ export type PrometheusGatewayMethodMetadata = {
 
 export const PROMETHEUS_MUTATING_CONTROLS_ENV = "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS";
 
+type PrometheusPlannedMutatingMethodMetadata = {
+  access: "write";
+  mutatesState: true;
+  enabled: false;
+  enableEnvVar: typeof PROMETHEUS_MUTATING_CONTROLS_ENV;
+  reason: string;
+};
+
 export const PROMETHEUS_GATEWAY_METHOD_METADATA: Record<
   PrometheusGatewayMethod,
   PrometheusGatewayMethodMetadata
@@ -68,6 +76,30 @@ export const PROMETHEUS_GATEWAY_METHOD_METADATA: Record<
   },
 };
 
+export const PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA = {
+  "prometheus.control.execute": {
+    access: "write",
+    mutatesState: true,
+    enabled: false,
+    enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    reason: "Reserved for future state-mutating control command execution.",
+  },
+  "prometheus.control.autarch.commit": {
+    access: "write",
+    mutatesState: true,
+    enabled: false,
+    enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    reason: "Reserved for AUTARCH capability-gap commit flow.",
+  },
+  "prometheus.control.recursion.commit": {
+    access: "write",
+    mutatesState: true,
+    enabled: false,
+    enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+    reason: "Reserved for recursion cycle commit flow.",
+  },
+} as const satisfies Record<string, PrometheusPlannedMutatingMethodMetadata>;
+
 export function listPrometheusMutatingMethods(
   methodMetadata: Record<
     string,
@@ -76,6 +108,18 @@ export function listPrometheusMutatingMethods(
 ): string[] {
   return Object.entries(methodMetadata)
     .filter(([, metadata]) => metadata.mutatesState)
+    .map(([method]) => method)
+    .toSorted();
+}
+
+export function listPrometheusPlannedMutatingMethods(
+  methodMetadata: Record<
+    string,
+    PrometheusPlannedMutatingMethodMetadata
+  > = PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
+): string[] {
+  return Object.entries(methodMetadata)
+    .filter(([, metadata]) => !metadata.enabled && metadata.mutatesState)
     .map(([method]) => method)
     .toSorted();
 }
@@ -129,8 +173,44 @@ export function assertPrometheusGatewayMethodMetadataContract(args: {
   }
 }
 
+export function assertPrometheusPlannedMutatingMethodContract(args: {
+  activeMethods: readonly string[];
+  plannedMutatingMethodMetadata: Record<string, PrometheusPlannedMutatingMethodMetadata>;
+}): void {
+  const { activeMethods, plannedMutatingMethodMetadata } = args;
+  const plannedMethods = Object.keys(plannedMutatingMethodMetadata);
+  if (new Set(plannedMethods).size !== plannedMethods.length) {
+    throw new Error(
+      "PROMETHEUS planned method contract mismatch: duplicate planned methods detected",
+    );
+  }
+  for (const method of plannedMethods) {
+    if (activeMethods.includes(method)) {
+      throw new Error(
+        `PROMETHEUS planned method contract mismatch: ${method} overlaps active methods`,
+      );
+    }
+    const metadata = plannedMutatingMethodMetadata[method];
+    if (metadata.access !== "write" || metadata.enabled || !metadata.mutatesState) {
+      throw new Error(
+        `PROMETHEUS planned method contract mismatch: ${method} must be disabled mutating write`,
+      );
+    }
+    if (metadata.enableEnvVar !== PROMETHEUS_MUTATING_CONTROLS_ENV) {
+      throw new Error(
+        `PROMETHEUS planned method contract mismatch: ${method} has invalid env guard`,
+      );
+    }
+  }
+}
+
 assertPrometheusGatewayMethodMetadataContract({
   readMethods: PROMETHEUS_GATEWAY_READ_METHODS,
   writeMethods: PROMETHEUS_GATEWAY_WRITE_METHODS,
   methodMetadata: PROMETHEUS_GATEWAY_METHOD_METADATA,
+});
+
+assertPrometheusPlannedMutatingMethodContract({
+  activeMethods: PROMETHEUS_GATEWAY_METHODS,
+  plannedMutatingMethodMetadata: PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
 });

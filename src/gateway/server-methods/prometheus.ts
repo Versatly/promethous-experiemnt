@@ -15,6 +15,8 @@ import { formatForLog } from "../ws-log.js";
 import {
   arePrometheusMutatingControlsEnabled,
   listPrometheusMutatingMethods,
+  listPrometheusPlannedMutatingMethods,
+  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   type PrometheusGatewayMethodMetadata,
@@ -397,6 +399,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         ...PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action],
       }));
       const mutatingMethods = listPrometheusMutatingMethods();
+      const plannedMutatingMethods = listPrometheusPlannedMutatingMethods();
       const mutatingPreviewActions = listPrometheusMutatingPreviewActions();
       const plannedMutatingPreviewActions = listPrometheusPlannedMutatingPreviewActions();
       const mutationsEnabled = arePrometheusMutatingControlsEnabled();
@@ -418,6 +421,10 @@ export const prometheusHandlers: GatewayRequestHandlers = {
             enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
             mutatingMethods,
             mutatingPreviewActions,
+            plannedMutatingMethods: plannedMutatingMethods.map((method) => ({
+              method,
+              ...PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method],
+            })),
             plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => ({
               action,
               ...PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA[action],

@@ -652,6 +652,15 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
           enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
           mutatingMethods: [],
           mutatingPreviewActions: [],
+          plannedMutatingMethods: expect.arrayContaining([
+            expect.objectContaining({
+              method: "prometheus.control.execute",
+              access: "write",
+              mutatesState: true,
+              enabled: false,
+              enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            }),
+          ]),
           plannedMutatingPreviewActions: expect.arrayContaining([
             expect.objectContaining({
               action: "autarch.gap-detection.commit",

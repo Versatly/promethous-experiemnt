@@ -102,6 +102,8 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `ts`
   - `summary`
   - `guardrails`
+    - includes `mutationsEnabled`, `mutatingMethods`, `plannedMutatingMethods`,
+      `mutatingPreviewActions`, `plannedMutatingPreviewActions`
   - `methods`
   - `controlPreview`
 - `prometheus.goals`:
