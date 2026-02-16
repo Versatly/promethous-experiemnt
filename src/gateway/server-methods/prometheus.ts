@@ -67,6 +67,14 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0;
+}
+
+function isUnitInterval(value: unknown): value is number {
+  return isFiniteNumber(value) && value >= 0 && value <= 1;
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
@@ -332,14 +340,14 @@ function isPrometheusControlCatalogSnapshot(
   return (
     isFiniteNumber(candidate.ts) &&
     !!summary &&
-    isFiniteNumber(summary.totalMethods) &&
-    isFiniteNumber(summary.readMethods) &&
-    isFiniteNumber(summary.writeMethods) &&
-    isFiniteNumber(summary.mutatingMethods) &&
-    isFiniteNumber(summary.plannedMutatingMethods) &&
-    isFiniteNumber(summary.previewActions) &&
-    isFiniteNumber(summary.mutatingPreviewActions) &&
-    isFiniteNumber(summary.plannedMutatingPreviewActions) &&
+    isNonNegativeInteger(summary.totalMethods) &&
+    isNonNegativeInteger(summary.readMethods) &&
+    isNonNegativeInteger(summary.writeMethods) &&
+    isNonNegativeInteger(summary.mutatingMethods) &&
+    isNonNegativeInteger(summary.plannedMutatingMethods) &&
+    isNonNegativeInteger(summary.previewActions) &&
+    isNonNegativeInteger(summary.mutatingPreviewActions) &&
+    isNonNegativeInteger(summary.plannedMutatingPreviewActions) &&
     !!guardrails &&
     typeof guardrails.mutationsEnabled === "boolean" &&
     typeof guardrails.enableEnvVar === "string" &&
@@ -356,6 +364,8 @@ function isPrometheusControlCatalogSnapshot(
     !!controlPreviewActions &&
     controlPreviewActions.every(isPrometheusCatalogPreviewActionEntry) &&
     summary.totalMethods === methods.length &&
+    summary.readMethods === methods.filter((method) => method.access === "read").length &&
+    summary.writeMethods === methods.filter((method) => method.access === "write").length &&
     summary.readMethods + summary.writeMethods === summary.totalMethods &&
     summary.mutatingMethods === mutatingMethodsFromMethods?.length &&
     summary.plannedMutatingMethods === guardrails.plannedMutatingMethods.length &&
@@ -431,8 +441,9 @@ function isPrometheusAutarchGapDetectionPreview(value: unknown): boolean {
   }
   const suggestions = value.suggestions;
   return (
-    isFiniteNumber(value.suggestedGapCount) &&
+    isNonNegativeInteger(value.suggestedGapCount) &&
     Array.isArray(suggestions) &&
+    suggestions.length === value.suggestedGapCount &&
     suggestions.every((entry) => {
       if (!isRecord(entry)) {
         return false;
@@ -455,18 +466,21 @@ function isPrometheusHeliosTrajectoryPreview(value: unknown): boolean {
   const isValidDivergence =
     divergence === null ||
     (isRecord(divergence) &&
-      typeof divergence.severity === "string" &&
+      (divergence.severity === "low" ||
+        divergence.severity === "medium" ||
+        divergence.severity === "high") &&
       typeof divergence.reason === "string" &&
       isFiniteNumber(divergence.scoreDrop) &&
-      isFiniteNumber(divergence.latestScore));
+      isUnitInterval(divergence.latestScore));
   return (
     typeof value.goalId === "string" &&
     typeof value.goalStatus === "string" &&
-    isFiniteNumber(value.priorWindowSize) &&
+    isNonNegativeInteger(value.priorWindowSize) &&
     isFiniteNumber(value.computedSnapshot.at) &&
-    isFiniteNumber(value.computedSnapshot.completionRatio) &&
-    isFiniteNumber(value.computedSnapshot.blockedRatio) &&
-    isFiniteNumber(value.computedSnapshot.score) &&
+    isUnitInterval(value.computedSnapshot.completionRatio) &&
+    isUnitInterval(value.computedSnapshot.blockedRatio) &&
+    value.computedSnapshot.completionRatio + value.computedSnapshot.blockedRatio <= 1 &&
+    isUnitInterval(value.computedSnapshot.score) &&
     isValidDivergence
   );
 }
@@ -479,8 +493,10 @@ function isPrometheusRecursionMutationEvaluationPreview(value: unknown): boolean
     typeof value.evaluation.mutationId === "string" &&
     typeof value.evaluation.accepted === "boolean" &&
     isFiniteNumber(value.evaluation.scoreDelta) &&
-    isFiniteNumber(value.evaluation.baselineScore) &&
-    isFiniteNumber(value.evaluation.candidateScore) &&
+    value.evaluation.scoreDelta >= -1 &&
+    value.evaluation.scoreDelta <= 1 &&
+    isUnitInterval(value.evaluation.baselineScore) &&
+    isUnitInterval(value.evaluation.candidateScore) &&
     typeof value.evaluation.rationale === "string"
   );
 }

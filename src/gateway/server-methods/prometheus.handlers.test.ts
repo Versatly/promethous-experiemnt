@@ -901,6 +901,43 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
     );
   });
 
+  it("returns UNAVAILABLE when injected catalog snapshot read/write summary diverges from methods", async () => {
+    const handlers = createPrometheusHandlers({
+      buildControlCatalogSnapshot: () => {
+        const snapshot = buildPrometheusControlCatalogSnapshot();
+        return {
+          ...snapshot,
+          summary: {
+            ...snapshot.summary,
+            readMethods: snapshot.summary.readMethods + 1,
+          },
+        } as never;
+      },
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.catalog"]({
+      req: {
+        type: "req",
+        id: "control-catalog-invalid-read-write-summary",
+        method: "prometheus.control.catalog",
+      },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
+
   it("returns UNAVAILABLE when injected catalog snapshot planned-method metadata diverges from canonical contract", async () => {
     const handlers = createPrometheusHandlers({
       buildControlCatalogSnapshot: () => {
@@ -1431,6 +1468,106 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
       },
       params: {
         action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected control preview AUTARCH payload count diverges from suggestions", async () => {
+    const handlers = createPrometheusHandlers({
+      runControlPreview: async () =>
+        ({
+          ok: true,
+          payload: {
+            ts: Date.now(),
+            action: "autarch.gap-detection",
+            mutatesState: false,
+            preview: {
+              suggestedGapCount: 2,
+              suggestions: [
+                {
+                  suggestionId: "gap-1",
+                  goalId: "goal-1",
+                  severity: "high",
+                  description: "First",
+                },
+              ],
+            },
+          },
+        }) as never,
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "control-preview-invalid-autarch-count",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected control preview HELIOS payload ratios exceed bounds", async () => {
+    const handlers = createPrometheusHandlers({
+      runControlPreview: async () =>
+        ({
+          ok: true,
+          payload: {
+            ts: Date.now(),
+            action: "helios.trajectory-evaluation",
+            mutatesState: false,
+            preview: {
+              goalId: "goal-1",
+              goalStatus: "active",
+              computedSnapshot: {
+                at: Date.now(),
+                completionRatio: 0.8,
+                blockedRatio: 0.5,
+                score: 0.6,
+              },
+              priorWindowSize: 1,
+              divergence: null,
+            },
+          },
+        }) as never,
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "control-preview-invalid-helios-ratio-bounds",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "helios.trajectory-evaluation",
+        goalId: "goal-1",
       },
       client: null,
       isWebchatConnect: () => false,
