@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ErrorCodes } from "../protocol/index.js";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
+import { createGoalCreatedEvent } from "./prometheus.test-events.js";
 import {
   createPrometheusEventStoreForStateDir,
   createPrometheusTempDirHarness,
@@ -61,16 +62,15 @@ describe("prometheus handler error shape parity", () => {
   it("uses INVALID_REQUEST for trajectory validation failures", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-errors-");
     const eventStore = createPrometheusEventStoreForStateDir(stateDir);
-    await eventStore.append({
-      id: "evt-1",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-1",
+        occurredAt: 1,
         goalId: "known-goal",
         title: "Known goal",
         objective: "Objective",
-      },
-    });
+      }),
+    );
 
     const missingGoalRespond = vi.fn();
     await runPrometheusHandler({

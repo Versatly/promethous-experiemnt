@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
+import { createGoalCreatedEvent } from "./prometheus.test-events.js";
 import {
   createPrometheusEventStoreForStateDir,
   createPrometheusTempDirHarness,
@@ -17,17 +18,15 @@ describe("prometheusHandlers.prometheus.trajectory", () => {
   it("returns trajectory window and divergence for requested goal", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-trajectory-");
     const eventStore = createPrometheusEventStoreForStateDir(stateDir);
-    await eventStore.append({
-      id: "evt-goal",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-goal",
+        occurredAt: 1,
         goalId: "goal-root",
         title: "Root objective",
         objective: "ship system",
-        priority: 100,
-      },
-    });
+      }),
+    );
     const trajectoryStore = createPrometheusTrajectoryStoreForStateDir(stateDir);
     await trajectoryStore.appendBatch([
       {

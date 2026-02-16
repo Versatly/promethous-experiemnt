@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
+import { createGoalCreatedEvent } from "./prometheus.test-events.js";
 import {
   createPrometheusEventStoreForStateDir,
   createPrometheusTempDirHarness,
@@ -16,17 +17,13 @@ describe("prometheusHandlers.prometheus.recursion", () => {
     const stateDir = await makeTempDir("gateway-prometheus-recursion-");
     const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.appendBatch([
-      {
+      createGoalCreatedEvent({
         id: "evt-goal",
-        type: "goal.created",
         occurredAt: 1,
-        payload: {
-          goalId: "goal-root",
-          title: "Root objective",
-          objective: "ship system",
-          priority: 100,
-        },
-      },
+        goalId: "goal-root",
+        title: "Root objective",
+        objective: "ship system",
+      }),
       {
         id: "evt-cycle-1",
         type: "recursion.cycle-recorded",

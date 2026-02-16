@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
+import { createGoalCreatedEvent } from "./prometheus.test-events.js";
 import {
   createPrometheusEventStoreForStateDir,
   createPrometheusTempDirHarness,
@@ -18,17 +19,13 @@ describe("prometheusHandlers.prometheus.status", () => {
     const stateDir = await makeTempDir("gateway-prometheus-status-");
     const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.appendBatch([
-      {
+      createGoalCreatedEvent({
         id: "evt-1",
-        type: "goal.created",
         occurredAt: 1,
-        payload: {
-          goalId: "root",
-          title: "Root objective",
-          objective: "ship system",
-          priority: 100,
-        },
-      },
+        goalId: "root",
+        title: "Root objective",
+        objective: "ship system",
+      }),
       {
         id: "evt-2",
         type: "goal.status-updated",

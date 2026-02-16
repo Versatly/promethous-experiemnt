@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
+import { createGoalCreatedEvent } from "./prometheus.test-events.js";
 import {
   createPrometheusEventStoreForStateDir,
   createPrometheusTempDirHarness,
@@ -17,28 +18,21 @@ describe("prometheus adapter summary consistency", () => {
     const stateDir = await makeTempDir("gateway-prometheus-consistency-");
     const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.appendBatch([
-      {
+      createGoalCreatedEvent({
         id: "evt-goal-1",
-        type: "goal.created",
         occurredAt: 1,
-        payload: {
-          goalId: "goal-1",
-          title: "Goal 1",
-          objective: "Ship objective",
-          priority: 100,
-        },
-      },
-      {
+        goalId: "goal-1",
+        title: "Goal 1",
+        objective: "Ship objective",
+      }),
+      createGoalCreatedEvent({
         id: "evt-goal-2",
-        type: "goal.created",
         occurredAt: 2,
-        payload: {
-          goalId: "goal-2",
-          title: "Goal 2",
-          objective: "Ship dependency",
-          priority: 90,
-        },
-      },
+        goalId: "goal-2",
+        title: "Goal 2",
+        objective: "Ship dependency",
+        priority: 90,
+      }),
       {
         id: "evt-gap-1",
         type: "capability-gap.detected",
