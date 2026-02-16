@@ -26,9 +26,11 @@ type HealthStatusHandlerParams = Parameters<
 >[0];
 
 describe("gateway server-methods export surface", () => {
-  it("keeps Prometheus auth guard helpers internal to auth-guards module", () => {
+  it("keeps Prometheus guard helpers internal to dedicated modules", () => {
     expect("getPrometheusMutatingControlGuardError" in gatewayServerMethods).toBe(false);
     expect("getPrometheusPlannedMutatingMethodGuardError" in gatewayServerMethods).toBe(false);
+    expect("isPrometheusControlCatalogSnapshot" in gatewayServerMethods).toBe(false);
+    expect("isPrometheusControlPreviewResult" in gatewayServerMethods).toBe(false);
   });
 });
 
