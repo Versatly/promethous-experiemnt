@@ -166,6 +166,16 @@ export function buildPrometheusPlannedMutatingMethodPreflight(args: {
   };
 }
 
+export function getPrometheusPlannedMutatingMethodPreflight(
+  method: string,
+): PrometheusPlannedMutatingMethodPreflight | undefined {
+  const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+  if (!metadata) {
+    return undefined;
+  }
+  return buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+}
+
 export function arePrometheusMutatingControlsEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {

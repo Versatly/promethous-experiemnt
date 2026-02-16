@@ -13,6 +13,7 @@ import {
   assertPrometheusPlannedMutatingPreviewActionContract,
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
+  getPrometheusPlannedMutatingPreviewActionPreflight,
   isPrometheusPlannedMutatingPreviewAction,
   listPrometheusPlannedMutatingPreviewActions,
   listPrometheusMutatingPreviewActions,
@@ -343,6 +344,20 @@ describe("prometheus control preview helpers", () => {
         requiredParams: ["goalId"],
       }),
     });
+  });
+
+  it("returns planned mutating action preflight only for known actions", () => {
+    expect(
+      getPrometheusPlannedMutatingPreviewActionPreflight("autarch.gap-detection.commit"),
+    ).toEqual(
+      expect.objectContaining({
+        disabledMessage: expect.stringContaining("autarch.gap-detection.commit"),
+        notImplementedMessage: expect.stringContaining("not implemented yet"),
+      }),
+    );
+    expect(getPrometheusPlannedMutatingPreviewActionPreflight("autarch.gap-detection")).toBe(
+      undefined,
+    );
   });
 
   it("returns UNAVAILABLE for planned mutating actions even when env guard is enabled", async () => {

@@ -146,6 +146,16 @@ export function buildPrometheusPlannedMutatingPreviewActionPreflight(args: {
   };
 }
 
+export function getPrometheusPlannedMutatingPreviewActionPreflight(
+  action: string,
+): PrometheusPlannedMutatingPreviewActionPreflight | undefined {
+  const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+  if (!metadata) {
+    return undefined;
+  }
+  return buildPrometheusPlannedMutatingPreviewActionPreflight({ action, metadata });
+}
+
 export function isPrometheusPlannedMutatingPreviewAction(
   value: unknown,
 ): value is PrometheusPlannedMutatingPreviewAction {
@@ -347,14 +357,10 @@ export async function runPrometheusControlPreview(
       return invalidRequest("action is required for prometheus.control.preview");
     }
     if (isPrometheusPlannedMutatingPreviewAction(rawAction)) {
-      const actionMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(rawAction);
-      if (!actionMetadata) {
+      const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(rawAction);
+      if (!preflight) {
         return unavailableRequest(formatPlannedMutatingActionNotImplementedMessage(rawAction));
       }
-      const preflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
-        action: rawAction,
-        metadata: actionMetadata,
-      });
       const controlsEnabled = arePrometheusMutatingControlsEnabled();
       if (!controlsEnabled) {
         return unavailableRequest(preflight.disabledMessage);

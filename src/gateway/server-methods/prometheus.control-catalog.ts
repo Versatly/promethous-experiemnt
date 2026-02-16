@@ -1,17 +1,17 @@
 import {
-  arePrometheusMutatingControlsEnabled,
-  buildPrometheusPlannedMutatingMethodPreflight,
-  getPrometheusPlannedMutatingMethodMetadata,
   listPrometheusMutatingMethods,
   listPrometheusPlannedMutatingMethods,
+  arePrometheusMutatingControlsEnabled,
+  getPrometheusPlannedMutatingMethodMetadata,
+  getPrometheusPlannedMutatingMethodPreflight,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./prometheus-methods.js";
 import {
-  buildPrometheusPlannedMutatingPreviewActionPreflight,
-  getPrometheusPlannedMutatingPreviewActionMetadata,
   listPrometheusMutatingPreviewActions,
   listPrometheusPlannedMutatingPreviewActions,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
+  getPrometheusPlannedMutatingPreviewActionPreflight,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
@@ -123,13 +123,14 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
         if (!metadata) {
           throw new Error(`Missing planned mutating method metadata for "${method}"`);
         }
+        const preflight = getPrometheusPlannedMutatingMethodPreflight(method);
+        if (!preflight) {
+          throw new Error(`Missing planned mutating method preflight for "${method}"`);
+        }
         return {
           method,
           ...metadata,
-          preflight: buildPrometheusPlannedMutatingMethodPreflight({
-            method,
-            metadata,
-          }),
+          preflight,
         };
       }),
       plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => {
@@ -137,13 +138,14 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
         if (!metadata) {
           throw new Error(`Missing planned mutating action metadata for "${action}"`);
         }
+        const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(action);
+        if (!preflight) {
+          throw new Error(`Missing planned mutating action preflight for "${action}"`);
+        }
         return {
           action,
           ...metadata,
-          preflight: buildPrometheusPlannedMutatingPreviewActionPreflight({
-            action,
-            metadata,
-          }),
+          preflight,
         };
       }),
     },

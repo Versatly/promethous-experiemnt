@@ -5,6 +5,7 @@ import {
   assertPrometheusPlannedMutatingMethodContract,
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusGatewayMethodMetadata,
+  getPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
   listPrometheusPlannedMutatingMethods,
   listPrometheusMutatingMethods,
@@ -201,6 +202,16 @@ describe("PROMETHEUS method access map", () => {
         requiredParams: ["action"],
       }),
     });
+  });
+
+  it("returns planned mutating method preflight only for known methods", () => {
+    expect(getPrometheusPlannedMutatingMethodPreflight("prometheus.control.execute")).toEqual(
+      expect.objectContaining({
+        disabledMessage: expect.stringContaining("prometheus.control.execute"),
+        notImplementedMessage: expect.stringContaining("not implemented yet"),
+      }),
+    );
+    expect(getPrometheusPlannedMutatingMethodPreflight("prometheus.status")).toBeUndefined();
   });
 
   it("exports stable planned mutating method set for rollout scaffolding", () => {

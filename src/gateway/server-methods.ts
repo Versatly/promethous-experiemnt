@@ -16,10 +16,9 @@ import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
 import {
   arePrometheusMutatingControlsEnabled,
-  buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusGatewayMethodMetadata,
-  getPrometheusPlannedMutatingMethodMetadata,
-  type PrometheusPlannedMutatingMethodMetadata,
+  getPrometheusPlannedMutatingMethodPreflight,
+  type PrometheusPlannedMutatingMethodPreflight,
   type PrometheusGatewayMethodMetadata,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
@@ -142,23 +141,19 @@ export function getPrometheusMutatingControlGuardError(args: {
 export function getPrometheusPlannedMutatingMethodGuardError(args: {
   method: string;
   env?: NodeJS.ProcessEnv;
-  resolvePlannedMethodMetadata?: (
+  resolvePlannedMethodPreflight?: (
     method: string,
-  ) => PrometheusPlannedMutatingMethodMetadata | undefined;
+  ) => PrometheusPlannedMutatingMethodPreflight | undefined;
 }) {
   const {
     method,
     env = process.env,
-    resolvePlannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata,
+    resolvePlannedMethodPreflight = getPrometheusPlannedMutatingMethodPreflight,
   } = args;
-  const plannedMetadata = resolvePlannedMethodMetadata(method);
-  if (!plannedMetadata) {
+  const preflight = resolvePlannedMethodPreflight(method);
+  if (!preflight) {
     return undefined;
   }
-  const preflight = buildPrometheusPlannedMutatingMethodPreflight({
-    method,
-    metadata: plannedMetadata,
-  });
   return arePrometheusMutatingControlsEnabled(env)
     ? errorShape(ErrorCodes.UNAVAILABLE, preflight.notImplementedMessage)
     : errorShape(ErrorCodes.UNAVAILABLE, preflight.disabledMessage);

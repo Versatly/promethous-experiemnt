@@ -65,14 +65,7 @@ describe("PROMETHEUS mutating-control guard", () => {
     const error = getPrometheusPlannedMutatingMethodGuardError({
       method: "prometheus.control.execute",
       env: {},
-      resolvePlannedMethodMetadata: () => ({
-        access: "write",
-        mutatesState: true,
-        enabled: false,
-        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
-        requiredParams: ["action"],
-        reason: "planned rollout",
-      }),
+      resolvePlannedMethodPreflight: () => preflight,
     });
     expect(error).toEqual(
       expect.objectContaining({
@@ -97,14 +90,7 @@ describe("PROMETHEUS mutating-control guard", () => {
     const error = getPrometheusPlannedMutatingMethodGuardError({
       method: "prometheus.control.execute",
       env: { [PROMETHEUS_MUTATING_CONTROLS_ENV]: "1" },
-      resolvePlannedMethodMetadata: () => ({
-        access: "write",
-        mutatesState: true,
-        enabled: false,
-        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
-        requiredParams: ["action"],
-        reason: "planned rollout",
-      }),
+      resolvePlannedMethodPreflight: () => preflight,
     });
     expect(error).toEqual(
       expect.objectContaining({
@@ -117,7 +103,7 @@ describe("PROMETHEUS mutating-control guard", () => {
   it("does not block methods outside planned mutating metadata", () => {
     const error = getPrometheusPlannedMutatingMethodGuardError({
       method: "prometheus.status",
-      resolvePlannedMethodMetadata: () => undefined,
+      resolvePlannedMethodPreflight: () => undefined,
     });
     expect(error).toBeUndefined();
   });
