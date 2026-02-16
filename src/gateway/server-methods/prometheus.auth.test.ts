@@ -76,6 +76,40 @@ describe("PROMETHEUS gateway authorization", () => {
     );
   });
 
+  it.each(READ_METHODS)("allows operator.write scope for %s", async (method) => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: `write-${method}`,
+        method,
+        params: method === "prometheus.trajectory" ? { goalId: "goal-root" } : {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalled();
+    const [ok, , error] = respond.mock.calls[0] as [
+      boolean,
+      unknown,
+      { message?: string } | undefined,
+    ];
+    if (method === "prometheus.trajectory") {
+      expect(ok).toBe(false);
+      expect(error?.message).toContain('Unknown goalId "goal-root"');
+      return;
+    }
+    expect(ok).toBe(true);
+  });
+
   it.each(READ_METHODS)("rejects node role access for %s", async (method) => {
     const respond = vi.fn();
     await handleGatewayRequest({
