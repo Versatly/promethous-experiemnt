@@ -9,6 +9,48 @@ afterEach(() => {
 });
 
 describe("PROMETHEUS gateway authorization override regressions", () => {
+  it("does not invoke PROMETHEUS auth override resolvers for non-prometheus methods", async () => {
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not be called");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not be called");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not be called");
+    });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "non-prometheus-auth-override-short-circuit",
+        method: "status",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+    });
+
+    expect(respond).toHaveBeenCalled();
+    const [ok] = respond.mock.calls[0] as [boolean, unknown, unknown];
+    expect(ok).toBe(true);
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
   it("returns UNAVAILABLE when injected catalog dependency violates summary invariants at request level", async () => {
     const respond = vi.fn();
     await handleGatewayRequest({
