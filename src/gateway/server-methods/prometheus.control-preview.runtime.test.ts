@@ -1,5 +1,3 @@
-import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -9,20 +7,12 @@ import {
 import { ErrorCodes } from "../protocol/index.js";
 import { runPrometheusControlPreview } from "./prometheus.control-preview.js";
 import { formatPrometheusMissingRequiredParamsMessage } from "./prometheus.preflight-guards.js";
+import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
 
-const cleanupDirs = new Set<string>();
-
-async function makeTempDir(prefix: string): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
-  cleanupDirs.add(dir);
-  return dir;
-}
+const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
 afterEach(async () => {
-  for (const dir of cleanupDirs) {
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-  cleanupDirs.clear();
+  await cleanupTempDirs();
   vi.unstubAllEnvs();
 });
 
