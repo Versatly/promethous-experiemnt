@@ -7,6 +7,7 @@ const BASE_METHODS = [
   "channels.logout",
   "status",
   "prometheus.status",
+  "prometheus.goals",
   "usage.status",
   "usage.cost",
   "tts.status",

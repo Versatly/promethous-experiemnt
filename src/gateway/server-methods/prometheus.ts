@@ -2,6 +2,7 @@ import path from "node:path";
 import type { GatewayRequestHandlers } from "./types.js";
 import { resolveStateDir } from "../../config/paths.js";
 import {
+  buildCapabilityGraph,
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
   detectTrajectoryDivergence,
@@ -103,6 +104,45 @@ export const prometheusHandlers: GatewayRequestHandlers = {
           },
           rootGoals,
           alignment,
+        },
+        undefined,
+      );
+    } catch (error) {
+      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+    }
+  },
+  "prometheus.goals": async ({ respond, params }) => {
+    try {
+      const stateDir = resolveObserverStateDir(params);
+      const eventStore = createFilePrometheusEventStore(
+        path.join(stateDir, "prometheus", "events.jsonl"),
+      );
+      const events = await eventStore.readAll();
+      const state = replayPrometheusEvents(events);
+      const graph = buildCapabilityGraph({ state });
+      const goals = Object.values(state.goals)
+        .toSorted((left, right) => right.priority - left.priority)
+        .map((goal) => ({
+          goalId: goal.id,
+          title: goal.title,
+          status: goal.status,
+          priority: goal.priority,
+          parentGoalId: goal.parentGoalId,
+          childGoalIds: goal.childGoalIds,
+          capabilityCoverage: graph.coverageByGoal[goal.id] ?? {
+            goalId: goal.id,
+            capabilityIds: [],
+            integratedCount: 0,
+            provisionalCount: 0,
+            unresolvedGapIds: [],
+          },
+        }));
+      respond(
+        true,
+        {
+          ts: Date.now(),
+          total: goals.length,
+          goals,
         },
         undefined,
       );

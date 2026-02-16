@@ -124,4 +124,93 @@ describe("gateway prometheus.status", () => {
     expect(response.payload?.rootGoals?.[0]?.divergence?.reason).toContain("minimum floor");
     ws.close();
   });
+
+  it("returns goal/capability coverage view from prometheus.goals", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-goals-root",
+        type: "goal.created",
+        occurredAt: 10,
+        payload: {
+          goalId: "goal-root-2",
+          title: "Root 2",
+          objective: "Expand system",
+          priority: 100,
+        },
+      },
+      {
+        id: "evt-goals-child",
+        type: "goal.created",
+        occurredAt: 11,
+        payload: {
+          goalId: "goal-child-2",
+          parentGoalId: "goal-root-2",
+          title: "Child 2",
+          objective: "Deliver capability",
+          priority: 90,
+        },
+      },
+      {
+        id: "evt-gap-2",
+        type: "capability-gap.detected",
+        occurredAt: 12,
+        payload: {
+          gapId: "gap-2",
+          goalId: "goal-child-2",
+          description: "missing delivery capability",
+          severity: "high",
+        },
+      },
+      {
+        id: "evt-cap-2",
+        type: "capability-synthesized.recorded",
+        occurredAt: 13,
+        payload: {
+          capabilityId: "cap-2",
+          gapId: "gap-2",
+          name: "Delivery capability",
+          designSpec: "delivery-spec",
+          status: "validated",
+        },
+      },
+    ]);
+
+    const { ws } = await harness.openClient();
+    const goalsP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-goals",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-goals",
+        method: "prometheus.goals",
+      }),
+    );
+    const response = (await goalsP) as {
+      ok?: boolean;
+      payload?: {
+        total?: number;
+        goals?: Array<{
+          goalId?: string;
+          capabilityCoverage?: {
+            capabilityIds?: string[];
+            provisionalCount?: number;
+          };
+        }>;
+      };
+    };
+
+    const childGoal = response.payload?.goals?.find((goal) => goal.goalId === "goal-child-2");
+    expect(response.ok).toBe(true);
+    expect(response.payload?.total).toBeGreaterThanOrEqual(2);
+    expect(childGoal?.capabilityCoverage?.capabilityIds).toContain("cap-2");
+    expect(childGoal?.capabilityCoverage?.provisionalCount).toBe(1);
+    ws.close();
+  });
 });

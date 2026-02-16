@@ -80,6 +80,7 @@ const READ_METHODS = new Set([
   "config.get",
   "talk.config",
   "prometheus.status",
+  "prometheus.goals",
 ]);
 const WRITE_METHODS = new Set([
   "send",

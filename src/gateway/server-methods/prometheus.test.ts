@@ -104,6 +104,93 @@ describe("prometheusHandlers.prometheus.status", () => {
   });
 });
 
+describe("prometheusHandlers.prometheus.goals", () => {
+  it("returns goal tree with capability coverage summaries", async () => {
+    const stateDir = await makeTempDir("gateway-prometheus-goals-");
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-goal-root",
+        type: "goal.created",
+        occurredAt: 1,
+        payload: {
+          goalId: "goal-root",
+          title: "Root objective",
+          objective: "ship system",
+          priority: 100,
+        },
+      },
+      {
+        id: "evt-goal-child",
+        type: "goal.created",
+        occurredAt: 2,
+        payload: {
+          goalId: "goal-child",
+          parentGoalId: "goal-root",
+          title: "Child objective",
+          objective: "ship child",
+          priority: 90,
+        },
+      },
+      {
+        id: "evt-gap",
+        type: "capability-gap.detected",
+        occurredAt: 3,
+        payload: {
+          gapId: "gap-1",
+          goalId: "goal-child",
+          description: "missing capability",
+          severity: "high",
+        },
+      },
+      {
+        id: "evt-capability",
+        type: "capability-synthesized.recorded",
+        occurredAt: 4,
+        payload: {
+          capabilityId: "cap-1",
+          gapId: "gap-1",
+          name: "Planner capability",
+          designSpec: "design",
+          status: "validated",
+        },
+      },
+    ]);
+
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.goals"]({
+      req: { type: "req", id: "2", method: "prometheus.goals" },
+      params: {
+        stateDir,
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        total: 2,
+        goals: expect.arrayContaining([
+          expect.objectContaining({
+            goalId: "goal-child",
+            capabilityCoverage: expect.objectContaining({
+              capabilityIds: ["cap-1"],
+              provisionalCount: 1,
+              unresolvedGapIds: ["gap-1"],
+            }),
+          }),
+        ]),
+      }),
+      undefined,
+    );
+  });
+});
+
 describe("prometheus.status gateway authorization", () => {
   it("allows operator.read scope", async () => {
     const respond = vi.fn();
@@ -127,6 +214,50 @@ describe("prometheus.status gateway authorization", () => {
     const respond = vi.fn();
     await handleGatewayRequest({
       req: { type: "req", id: "read-2", method: "prometheus.status", params: {} },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: [],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("operator.read"),
+      }),
+    );
+  });
+});
+
+describe("prometheus.goals gateway authorization", () => {
+  it("allows operator.read scope", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: { type: "req", id: "goals-read-1", method: "prometheus.goals", params: {} },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(true, expect.any(Object), undefined);
+  });
+
+  it("rejects calls without read or write scope", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: { type: "req", id: "goals-read-2", method: "prometheus.goals", params: {} },
       client: {
         connect: {
           role: "operator",
