@@ -622,6 +622,76 @@ describe("PROMETHEUS gateway authorization", () => {
     );
   });
 
+  it("returns UNAVAILABLE when injected method metadata auth override throws", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "auth-method-metadata-override-throws",
+        method: "prometheus.status",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusMethodMetadata: () => {
+          throw new Error("method metadata override exploded");
+        },
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("method metadata override exploded"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected planned preflight auth override throws", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "auth-planned-preflight-override-throws",
+        method: "prometheus.control.execute",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodPreflight: () => {
+          throw new Error("planned preflight override exploded");
+        },
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("planned preflight override exploded"),
+      }),
+    );
+  });
+
   it("returns UNAVAILABLE when injected catalog dependency violates summary invariants at request level", async () => {
     const respond = vi.fn();
     await handleGatewayRequest({
