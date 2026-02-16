@@ -361,4 +361,39 @@ describe("PROMETHEUS gateway authorization", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected auth override resolver throws", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-auth-override-throws",
+        method: "prometheus.control.execute",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodMetadata: () => {
+          throw new Error("auth override dependency exploded");
+        },
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("auth override dependency exploded"),
+      }),
+    );
+  });
 });

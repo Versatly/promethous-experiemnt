@@ -37,6 +37,7 @@ import { usageHandlers } from "./server-methods/usage.js";
 import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
+import { formatForLog } from "./ws-log.js";
 
 const ADMIN_SCOPE = "operator.admin";
 const READ_SCOPE = "operator.read";
@@ -309,7 +310,13 @@ export async function handleGatewayRequest(
   },
 ): Promise<void> {
   const { req, respond, client, isWebchatConnect, context } = opts;
-  const authError = authorizeGatewayMethod(req.method, client, opts.authOverrides);
+  let authError;
+  try {
+    authError = authorizeGatewayMethod(req.method, client, opts.authOverrides);
+  } catch (error) {
+    respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+    return;
+  }
   if (authError) {
     respond(false, undefined, authError);
     return;
