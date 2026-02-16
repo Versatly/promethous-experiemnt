@@ -55,6 +55,60 @@ describe("prometheus control preview runtime flows", () => {
     });
   });
 
+  it("does not invoke planned-action resolvers for unsupported actions", async () => {
+    const resolvePlannedActionMetadata = vi.fn(() => {
+      throw new Error("metadata resolver should not be called");
+    });
+    const resolvePlannedActionPreflight = vi.fn(() => {
+      throw new Error("preflight resolver should not be called");
+    });
+    const result = await runPrometheusControlPreview(
+      {
+        action: "unknown.action",
+      },
+      {
+        resolvePlannedActionMetadata,
+        resolvePlannedActionPreflight,
+      },
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.INVALID_REQUEST,
+        message: 'Unsupported control preview action "unknown.action"',
+      },
+    });
+    expect(resolvePlannedActionMetadata).not.toHaveBeenCalled();
+    expect(resolvePlannedActionPreflight).not.toHaveBeenCalled();
+  });
+
+  it("does not invoke planned-action resolvers for active non-planned actions", async () => {
+    const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
+    const resolvePlannedActionMetadata = vi.fn(() => {
+      throw new Error("metadata resolver should not be called");
+    });
+    const resolvePlannedActionPreflight = vi.fn(() => {
+      throw new Error("preflight resolver should not be called");
+    });
+    const result = await runPrometheusControlPreview(
+      {
+        stateDir,
+        action: "autarch.gap-detection",
+      },
+      {
+        resolvePlannedActionMetadata,
+        resolvePlannedActionPreflight,
+      },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.payload.action).toBe("autarch.gap-detection");
+    expect(resolvePlannedActionMetadata).not.toHaveBeenCalled();
+    expect(resolvePlannedActionPreflight).not.toHaveBeenCalled();
+  });
+
   it("returns AUTARCH gap-detection preview for blocked goals", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
     const eventStore = createFilePrometheusEventStore(
