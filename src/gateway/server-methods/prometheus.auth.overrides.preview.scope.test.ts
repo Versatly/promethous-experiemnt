@@ -6,6 +6,7 @@ import {
 } from "./prometheus.control-preview.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 import {
+  runPrometheusNodeRequest,
   runPrometheusOperatorRequest,
   runPrometheusWriteRequest,
 } from "./prometheus.request-test-helpers.js";
@@ -73,6 +74,40 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
       undefined,
       expect.objectContaining({
         message: expect.stringContaining("missing scope: operator.write"),
+      }),
+    );
+    expect(runControlPreview).not.toHaveBeenCalled();
+    expect(buildControlCatalogSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("does not invoke injected preview dependencies when node role is denied", async () => {
+    const runControlPreview = vi.fn(async () => {
+      throw new Error("preview dependency should not run before role denial");
+    });
+    const buildControlCatalogSnapshot = vi.fn(() => {
+      throw new Error("catalog dependency should not run before role denial");
+    });
+    const respond = vi.fn();
+    await runPrometheusNodeRequest({
+      request: {
+        id: "node-role-short-circuit-preview-deps",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      },
+      respond,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview,
+        buildControlCatalogSnapshot,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: node"),
       }),
     );
     expect(runControlPreview).not.toHaveBeenCalled();
