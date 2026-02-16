@@ -145,6 +145,34 @@ describe("PROMETHEUS mutating-control guard", () => {
     );
   });
 
+  it("invokes planned metadata/preflight resolvers for requested planned method", () => {
+    const method = "prometheus.control.execute";
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+    const resolvePlannedMethodMetadata = vi.fn(() => metadata);
+    const resolvePlannedMethodPreflight = vi.fn(() => preflight);
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method,
+      env: {},
+      resolvePlannedMethodMetadata,
+      resolvePlannedMethodPreflight,
+    });
+    expect(error).toEqual(
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: preflight.disabledMessage,
+      }),
+    );
+    expect(resolvePlannedMethodMetadata).toHaveBeenCalledTimes(1);
+    expect(resolvePlannedMethodPreflight).toHaveBeenCalledTimes(1);
+    expect(resolvePlannedMethodMetadata).toHaveBeenCalledWith(method);
+    expect(resolvePlannedMethodPreflight).toHaveBeenCalledWith(method);
+  });
+
   it("falls back to metadata when planned preflight resolver is missing", () => {
     const metadata = {
       access: "write" as const,
