@@ -63,9 +63,23 @@ function resolveRecursionWindowSize(params: Record<string, unknown>): number {
 
 const CAPITAL_FORMS = ["money", "compute", "materials", "labor", "political", "data"] as const;
 type CapitalForm = (typeof CAPITAL_FORMS)[number];
+const GAP_SEVERITIES = ["low", "medium", "high", "critical"] as const;
+type GapSeverity = (typeof GAP_SEVERITIES)[number];
 
 function isCapitalForm(value: unknown): value is CapitalForm {
   return typeof value === "string" && CAPITAL_FORMS.includes(value as CapitalForm);
+}
+
+function isGapSeverity(value: unknown): value is GapSeverity {
+  return typeof value === "string" && GAP_SEVERITIES.includes(value as GapSeverity);
+}
+
+function resolveMaxItems(params: Record<string, unknown>, fallback = 50): number {
+  const raw = params.maxItems;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return fallback;
+  }
+  return Math.max(1, Math.min(500, Math.floor(raw)));
 }
 
 function resolveCapitalDemands(params: Record<string, unknown>) {
@@ -331,6 +345,107 @@ export const prometheusHandlers: GatewayRequestHandlers = {
             acceptanceRatio,
           },
           cycles,
+        },
+        undefined,
+      );
+    } catch (error) {
+      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+    }
+  },
+  "prometheus.autarch": async ({ respond, params }) => {
+    try {
+      const stateDir = resolveObserverStateDir(params);
+      const eventStore = createFilePrometheusEventStore(
+        path.join(stateDir, "prometheus", "events.jsonl"),
+      );
+      const events = await eventStore.readAll();
+      const state = replayPrometheusEvents(events);
+      const graph = buildCapabilityGraph({ state });
+      const severityFilter = isGapSeverity(params.severity) ? params.severity : null;
+      const includeResolved = params.includeResolved === true;
+      const maxItems = resolveMaxItems(params, 100);
+
+      const gaps = Object.values(state.capabilityGaps)
+        .filter((gap) => (includeResolved ? true : !gap.resolvedAt))
+        .filter((gap) => (severityFilter ? gap.severity === severityFilter : true))
+        .toSorted((left, right) => {
+          if (left.createdAt === right.createdAt) {
+            return left.id.localeCompare(right.id);
+          }
+          return right.createdAt - left.createdAt;
+        })
+        .slice(0, maxItems)
+        .map((gap) => ({
+          gapId: gap.id,
+          goalId: gap.goalId,
+          goalTitle: state.goals[gap.goalId]?.title,
+          severity: gap.severity,
+          description: gap.description,
+          createdAt: gap.createdAt,
+          resolvedAt: gap.resolvedAt,
+          hasSynthesizedCapability: Object.values(state.synthesizedCapabilities).some(
+            (capability) => capability.gapId === gap.id,
+          ),
+        }));
+
+      const capabilities = Object.values(state.synthesizedCapabilities)
+        .toSorted((left, right) => {
+          if (left.updatedAt === right.updatedAt) {
+            return left.id.localeCompare(right.id);
+          }
+          return right.updatedAt - left.updatedAt;
+        })
+        .slice(0, maxItems)
+        .map((capability) => {
+          const gap = state.capabilityGaps[capability.gapId];
+          return {
+            capabilityId: capability.id,
+            name: capability.name,
+            status: capability.status,
+            gapId: capability.gapId,
+            goalId: gap?.goalId,
+            goalTitle: gap ? state.goals[gap.goalId]?.title : undefined,
+            createdAt: capability.createdAt,
+            updatedAt: capability.updatedAt,
+          };
+        });
+
+      const statusCounts = Object.values(state.synthesizedCapabilities).reduce(
+        (accumulator, capability) => {
+          accumulator[capability.status] += 1;
+          return accumulator;
+        },
+        {
+          proposed: 0,
+          validated: 0,
+          integrated: 0,
+          rejected: 0,
+        } as Record<"proposed" | "validated" | "integrated" | "rejected", number>,
+      );
+
+      const unresolvedGaps = Object.values(state.capabilityGaps).filter((gap) => !gap.resolvedAt);
+      const criticalUnresolved = unresolvedGaps.filter((gap) => gap.severity === "critical");
+      const goalsWithUnresolvedGaps = Array.from(new Set(unresolvedGaps.map((gap) => gap.goalId)));
+
+      respond(
+        true,
+        {
+          ts: Date.now(),
+          summary: {
+            capabilityGaps: Object.keys(state.capabilityGaps).length,
+            unresolvedCapabilityGaps: unresolvedGaps.length,
+            criticalUnresolvedCapabilityGaps: criticalUnresolved.length,
+            synthesizedCapabilities: Object.keys(state.synthesizedCapabilities).length,
+            synthesizedByStatus: statusCounts,
+            goalsWithUnresolvedGaps: goalsWithUnresolvedGaps.length,
+          },
+          graph: {
+            capabilityNodes: Object.keys(graph.capabilities).length,
+            edgeCount: graph.edges.length,
+          },
+          goalsWithUnresolvedGaps,
+          gaps,
+          capabilities,
         },
         undefined,
       );

@@ -8,6 +8,7 @@ describe("listGatewayMethods", () => {
     expect(methods).toContain("prometheus.trajectory");
     expect(methods).toContain("prometheus.goals");
     expect(methods).toContain("prometheus.recursion");
+    expect(methods).toContain("prometheus.autarch");
     expect(methods).toContain("prometheus.monolith");
   });
 

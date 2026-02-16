@@ -73,7 +73,8 @@ read-only compatibility adapters under the `prometheus.*` namespace:
 2. `prometheus.trajectory`
 3. `prometheus.goals`
 4. `prometheus.recursion`
-5. `prometheus.monolith`
+5. `prometheus.autarch`
+6. `prometheus.monolith`
 
 These methods are intentionally scoped to telemetry and read models. They do not mutate state.
 
@@ -104,6 +105,13 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `windowSize`
   - `totals`
   - `cycles`
+- `prometheus.autarch`:
+  - `ts`
+  - `summary`
+  - `graph`
+  - `goalsWithUnresolvedGaps`
+  - `gaps`
+  - `capabilities`
 - `prometheus.monolith`:
   - `ts`
   - `summary`

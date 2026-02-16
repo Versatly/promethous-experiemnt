@@ -367,6 +367,87 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("returns AUTARCH capability and gap telemetry from prometheus.autarch", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-autarch-goal",
+        type: "goal.created",
+        occurredAt: 24,
+        payload: {
+          goalId: "goal-autarch",
+          title: "Autarch goal",
+          objective: "Synthesize missing capability",
+          priority: 90,
+        },
+      },
+      {
+        id: "evt-autarch-gap",
+        type: "capability-gap.detected",
+        occurredAt: 25,
+        payload: {
+          gapId: "gap-autarch",
+          goalId: "goal-autarch",
+          description: "missing synthesis capability",
+          severity: "critical",
+        },
+      },
+      {
+        id: "evt-autarch-cap",
+        type: "capability-synthesized.recorded",
+        occurredAt: 26,
+        payload: {
+          capabilityId: "cap-autarch",
+          gapId: "gap-autarch",
+          name: "Synthesis capability",
+          designSpec: "autarch-spec",
+          status: "validated",
+        },
+      },
+    ]);
+
+    const { ws } = await harness.openClient();
+    const autarchP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-autarch",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-autarch",
+        method: "prometheus.autarch",
+        params: {
+          severity: "critical",
+        },
+      }),
+    );
+    const response = (await autarchP) as {
+      ok?: boolean;
+      payload?: {
+        summary?: {
+          unresolvedCapabilityGaps?: number;
+          synthesizedCapabilities?: number;
+        };
+        gaps?: Array<{ gapId?: string; severity?: string }>;
+        capabilities?: Array<{ capabilityId?: string; status?: string }>;
+      };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.summary?.unresolvedCapabilityGaps).toBeGreaterThanOrEqual(1);
+    expect(response.payload?.summary?.synthesizedCapabilities).toBeGreaterThanOrEqual(1);
+    expect(response.payload?.gaps?.[0]?.severity).toBe("critical");
+    expect(
+      response.payload?.capabilities?.some(
+        (capability) => capability.capabilityId === "cap-autarch",
+      ),
+    ).toBe(true);
+    ws.close();
+  });
+
   it("returns monolith institutional capital telemetry and allocation preview", async () => {
     const stateDir = resolveStateDir();
     const eventStore = createFilePrometheusEventStore(

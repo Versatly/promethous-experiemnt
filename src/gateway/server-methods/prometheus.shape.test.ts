@@ -135,6 +135,7 @@ describe("prometheus handlers response shape", () => {
     });
     const goalsPayload = await call("prometheus.goals", { stateDir });
     const recursionPayload = await call("prometheus.recursion", { stateDir });
+    const autarchPayload = await call("prometheus.autarch", { stateDir });
     const monolithPayload = await call("prometheus.monolith", { stateDir });
 
     expect(payloadTopKeys(statusPayload)).toEqual([
@@ -157,6 +158,14 @@ describe("prometheus handlers response shape", () => {
     ]);
     expect(payloadTopKeys(goalsPayload)).toEqual(["goals", "total", "ts"]);
     expect(payloadTopKeys(recursionPayload)).toEqual(["cycles", "totals", "ts", "windowSize"]);
+    expect(payloadTopKeys(autarchPayload)).toEqual([
+      "capabilities",
+      "gaps",
+      "goalsWithUnresolvedGaps",
+      "graph",
+      "summary",
+      "ts",
+    ]);
     expect(payloadTopKeys(monolithPayload)).toEqual([
       "allocationPreview",
       "institutions",
