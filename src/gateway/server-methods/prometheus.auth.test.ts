@@ -61,6 +61,10 @@ describe("PROMETHEUS gateway authorization", () => {
   });
 
   it("keeps canonical non-mutating auth behavior when method metadata override diverges", async () => {
+    const resolvePrometheusMethodMetadata = vi.fn(() => ({
+      access: "write",
+      mutatesState: true,
+    }));
     const respond = vi.fn();
     await handleGatewayRequest({
       req: {
@@ -79,10 +83,7 @@ describe("PROMETHEUS gateway authorization", () => {
       respond,
       context: {} as GatewayRequestContext,
       authOverrides: {
-        resolvePrometheusMethodMetadata: () => ({
-          access: "write",
-          mutatesState: true,
-        }),
+        resolvePrometheusMethodMetadata,
       },
     });
 
@@ -93,6 +94,8 @@ describe("PROMETHEUS gateway authorization", () => {
       }),
       undefined,
     );
+    expect(resolvePrometheusMethodMetadata).toHaveBeenCalledTimes(1);
+    expect(resolvePrometheusMethodMetadata).toHaveBeenCalledWith("prometheus.status");
   });
 
   it("ignores planned-method auth overrides on non-planned request paths", async () => {
