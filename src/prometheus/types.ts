@@ -93,5 +93,11 @@ export type SynthesizedCapability = {
 export type RecursionCycle = {
   cycleId: PrimitiveId;
   summary: string;
+  mutationId?: PrimitiveId;
+  proposalTitle?: string;
+  evaluationScore?: number;
+  accepted?: boolean;
+  rollbackOfCycleId?: PrimitiveId;
+  rationale?: string;
   occurredAt: number;
 };
