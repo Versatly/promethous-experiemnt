@@ -1,6 +1,5 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import {
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
@@ -10,7 +9,7 @@ import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
 } from "./prometheus.control-preview.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
@@ -49,16 +48,13 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
     ]);
 
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-1", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-1",
       params: {
         stateDir,
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -92,8 +88,8 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
     });
 
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-2", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-2",
       params: {
         stateDir,
         action: "recursion.mutation-evaluation",
@@ -115,10 +111,7 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
           throughput: 0.52,
         },
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -166,17 +159,14 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
     });
 
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-3", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-3",
       params: {
         stateDir,
         action: "helios.trajectory-evaluation",
         goalId: "goal-helios",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -198,15 +188,12 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
 
   it("rejects unsupported control preview action with INVALID_REQUEST", async () => {
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-4", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-4",
       params: {
         action: "prometheus.unknown-action",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -228,16 +215,13 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
       return;
     }
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-5", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-5",
       params: {
         action: "autarch.gap-detection.commit",
         goalId: "goal-root",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

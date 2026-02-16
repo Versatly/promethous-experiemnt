@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import {
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
@@ -9,7 +8,7 @@ import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
 } from "./prometheus.control-preview.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusControlCatalogHandler } from "./prometheus.handler-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -18,13 +17,9 @@ afterEach(() => {
 describe("prometheusHandlers.prometheus.control.catalog", () => {
   it("returns control-surface metadata for method and action contracts", async () => {
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.catalog"]({
-      req: { type: "req", id: "control-catalog-1", method: "prometheus.control.catalog" },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      requestId: "control-catalog-1",
       respond,
-      context: {} as GatewayRequestContext,
     });
     const plannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata(
       "prometheus.control.execute",
@@ -123,13 +118,9 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
   it("reflects env-enabled mutating control guardrail state", async () => {
     vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.catalog"]({
-      req: { type: "req", id: "control-catalog-2", method: "prometheus.control.catalog" },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      requestId: "control-catalog-2",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

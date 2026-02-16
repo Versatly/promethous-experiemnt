@@ -1,11 +1,10 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import {
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
 } from "../../prometheus/index.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
@@ -48,16 +47,13 @@ describe("prometheusHandlers.prometheus.control.preview non-mutating guarantees"
 
     const callControlPreview = async (params: Record<string, unknown>) => {
       const respond = vi.fn();
-      await prometheusHandlers["prometheus.control.preview"]({
-        req: { type: "req", id: "control-non-mutating", method: "prometheus.control.preview" },
+      await runPrometheusControlPreviewHandler({
+        requestId: "control-non-mutating",
         params: {
           stateDir,
           ...params,
         },
-        client: null,
-        isWebchatConnect: () => false,
         respond,
-        context: {} as GatewayRequestContext,
       });
       expect(respond).toHaveBeenCalledWith(
         true,

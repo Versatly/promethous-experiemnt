@@ -1,13 +1,12 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
 } from "./prometheus.control-preview.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
 import { formatPrometheusMissingRequiredParamsMessage } from "./prometheus.preflight-guards.js";
 import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
 
@@ -20,13 +19,10 @@ afterEach(async () => {
 describe("prometheus control-preview error shape parity", () => {
   it("uses INVALID_REQUEST for control preview validation failures", async () => {
     const missingActionRespond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-missing-action", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-missing-action",
       params: {},
-      client: null,
-      isWebchatConnect: () => false,
       respond: missingActionRespond,
-      context: {} as GatewayRequestContext,
     });
     expect(missingActionRespond).toHaveBeenCalledWith(
       false,
@@ -38,13 +34,10 @@ describe("prometheus control-preview error shape parity", () => {
     );
 
     const unsupportedActionRespond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-unsupported", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-unsupported",
       params: { action: "unsupported.action" },
-      client: null,
-      isWebchatConnect: () => false,
       respond: unsupportedActionRespond,
-      context: {} as GatewayRequestContext,
     });
     expect(unsupportedActionRespond).toHaveBeenCalledWith(
       false,
@@ -71,8 +64,8 @@ describe("prometheus control-preview error shape parity", () => {
     });
 
     const incompleteRecursionRespond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-rec-invalid", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-rec-invalid",
       params: {
         stateDir,
         action: "recursion.mutation-evaluation",
@@ -82,10 +75,7 @@ describe("prometheus control-preview error shape parity", () => {
           hypothesis: "missing snapshots",
         },
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond: incompleteRecursionRespond,
-      context: {} as GatewayRequestContext,
     });
     expect(incompleteRecursionRespond).toHaveBeenCalledWith(
       false,
@@ -114,16 +104,13 @@ describe("prometheus control-preview error shape parity", () => {
       metadata,
     });
     const plannedActionRespond = vi.fn();
-    await prometheusHandlers["prometheus.control.preview"]({
-      req: { type: "req", id: "control-planned-disabled", method: "prometheus.control.preview" },
+    await runPrometheusControlPreviewHandler({
+      requestId: "control-planned-disabled",
       params: {
         action: "autarch.gap-detection.commit",
         goalId: "goal-1",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond: plannedActionRespond,
-      context: {} as GatewayRequestContext,
     });
     expect(plannedActionRespond).toHaveBeenCalledWith(
       false,

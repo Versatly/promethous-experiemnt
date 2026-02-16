@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import {
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
@@ -13,18 +12,14 @@ import {
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusControlCatalogHandler } from "./prometheus.handler-test-helpers.js";
 
 describe("prometheus control-catalog consistency", () => {
   it("keeps control catalog response aligned with method/action metadata", async () => {
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.control.catalog"]({
-      req: { type: "req", id: "control-catalog", method: "prometheus.control.catalog" },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      requestId: "control-catalog",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(true, expect.any(Object), undefined);
