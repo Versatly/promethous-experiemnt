@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createPrometheusHandlers } from "./prometheus.js";
 import {
   runPrometheusReadRequest,
   runPrometheusWriteRequest,
@@ -94,6 +95,43 @@ describe("PROMETHEUS gateway authorization override error handling", () => {
         message: expect.stringContaining("method metadata override exploded"),
       }),
     );
+  });
+
+  it("does not invoke injected handlers when auth override resolver throws", async () => {
+    const runControlPreview = vi.fn(async () => {
+      throw new Error("control preview handler should not be called");
+    });
+    const respond = vi.fn();
+    await runPrometheusWriteRequest({
+      request: {
+        id: "auth-override-throw-short-circuits-injected-handler",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      },
+      respond,
+      authOverrides: {
+        resolvePrometheusMethodMetadata: () => {
+          throw new Error("method metadata override exploded before handler dispatch");
+        },
+      },
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining(
+          "method metadata override exploded before handler dispatch",
+        ),
+      }),
+    );
+    expect(runControlPreview).not.toHaveBeenCalled();
   });
 
   it("returns UNAVAILABLE when injected planned preflight auth override throws", async () => {
