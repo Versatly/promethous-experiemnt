@@ -8,7 +8,8 @@ import {
   createFilePrometheusEventStore,
 } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./prometheus-methods.js";
+import { assertPrometheusHandlerContract, prometheusHandlers } from "./prometheus.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -23,6 +24,37 @@ afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true });
   }
   cleanupDirs.clear();
+});
+
+describe("prometheusHandlers contract", () => {
+  it("keeps handler keys aligned with method metadata", () => {
+    expect(() =>
+      assertPrometheusHandlerContract({
+        handlers: prometheusHandlers,
+        methodMetadata: PROMETHEUS_GATEWAY_METHOD_METADATA,
+      }),
+    ).not.toThrow();
+  });
+
+  it("fails fast when handler keys diverge from method metadata", () => {
+    expect(() =>
+      assertPrometheusHandlerContract({
+        handlers: {
+          "prometheus.status": async (_opts) => undefined,
+        },
+        methodMetadata: {
+          "prometheus.status": {
+            access: "read",
+            mutatesState: false,
+          },
+          "prometheus.control.preview": {
+            access: "write",
+            mutatesState: false,
+          },
+        },
+      }),
+    ).toThrow("handlers and metadata keys diverged");
+  });
 });
 
 describe("prometheusHandlers.prometheus.status", () => {

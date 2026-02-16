@@ -12,7 +12,10 @@ import {
 } from "../../prometheus/index.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
-import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./prometheus-methods.js";
+import {
+  PROMETHEUS_GATEWAY_METHOD_METADATA,
+  type PrometheusGatewayMethodMetadata,
+} from "./prometheus-methods.js";
 import {
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
@@ -30,6 +33,21 @@ import {
   resolveSinceAt,
   resolveTrajectoryWindowSize,
 } from "./prometheus.params.js";
+
+export function assertPrometheusHandlerContract(args: {
+  handlers: GatewayRequestHandlers;
+  methodMetadata: Record<string, PrometheusGatewayMethodMetadata>;
+}): void {
+  const { handlers, methodMetadata } = args;
+  const handlerMethods = Object.keys(handlers).toSorted();
+  const metadataMethods = Object.keys(methodMetadata).toSorted();
+  if (
+    handlerMethods.length !== metadataMethods.length ||
+    handlerMethods.some((method, index) => metadataMethods[index] !== method)
+  ) {
+    throw new Error("PROMETHEUS handler contract mismatch: handlers and metadata keys diverged");
+  }
+}
 
 export const prometheusHandlers: GatewayRequestHandlers = {
   "prometheus.status": async ({ respond, params }) => {
@@ -511,3 +529,8 @@ export const prometheusHandlers: GatewayRequestHandlers = {
     }
   },
 };
+
+assertPrometheusHandlerContract({
+  handlers: prometheusHandlers,
+  methodMetadata: PROMETHEUS_GATEWAY_METHOD_METADATA,
+});

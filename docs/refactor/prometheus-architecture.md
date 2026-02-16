@@ -175,6 +175,8 @@ This keeps parity with existing gateway authorization semantics for telemetry me
 Method-level access and mutability metadata is centralized in gateway code
 (`PROMETHEUS_GATEWAY_METHOD_METADATA`) so read/write scope partitioning and non-mutating guarantees
 can be asserted in tests as new control methods are introduced.
+Handler coverage is fail-fast checked at module load (`assertPrometheusHandlerContract`) so
+metadata and implemented `prometheus.*` handlers cannot silently drift.
 
 ## Scope boundaries
 
