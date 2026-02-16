@@ -729,6 +729,62 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("allows operator.read scope for prometheus.control.catalog", async () => {
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.read"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-catalog-read-allow",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-catalog-read-allow",
+        method: "prometheus.control.catalog",
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      payload?: { methods?: Array<{ method?: string }> };
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(true);
+    expect(
+      response.payload?.methods?.some((method) => method.method === "prometheus.control.preview"),
+    ).toBe(true);
+    expect(response.error).toBeUndefined();
+    ws.close();
+  });
+
+  it("rejects node role for prometheus.control.catalog", async () => {
+    const { ws } = await harness.openClient({
+      role: "node",
+      scopes: ["operator.read"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-catalog-node-deny",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-catalog-node-deny",
+        method: "prometheus.control.catalog",
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.message).toContain("unauthorized role: node");
+    ws.close();
+  });
+
   it("returns HELIOS control preview payload for operator.write", async () => {
     const stateDir = resolveStateDir();
     const eventStore = createFilePrometheusEventStore(
