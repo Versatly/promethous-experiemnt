@@ -9,6 +9,7 @@ import { formatZonedTimestamp } from "../../infra/format-time/format-datetime.js
 import { resetLogger, setLoggerOverride } from "../../logging.js";
 import { ExecApprovalManager } from "../exec-approval-manager.js";
 import { validateExecApprovalRequestParams } from "../protocol/index.js";
+import * as gatewayServerMethods from "../server-methods.js";
 import { waitForAgentJob } from "./agent-job.js";
 import { injectTimestamp, timestampOptsFromConfig } from "./agent-timestamp.js";
 import { normalizeRpcAttachmentsToChatAttachments } from "./attachment-normalize.js";
@@ -23,6 +24,13 @@ vi.mock("../../commands/status.js", () => ({
 type HealthStatusHandlerParams = Parameters<
   (typeof import("./health.js"))["healthHandlers"]["status"]
 >[0];
+
+describe("gateway server-methods export surface", () => {
+  it("keeps Prometheus auth guard helpers internal to auth-guards module", () => {
+    expect("getPrometheusMutatingControlGuardError" in gatewayServerMethods).toBe(false);
+    expect("getPrometheusPlannedMutatingMethodGuardError" in gatewayServerMethods).toBe(false);
+  });
+});
 
 describe("waitForAgentJob", () => {
   it("maps lifecycle end events with aborted=true to timeout", async () => {
