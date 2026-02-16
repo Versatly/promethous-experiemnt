@@ -14,7 +14,10 @@ import { healthHandlers } from "./server-methods/health.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
-import { PROMETHEUS_GATEWAY_READ_METHODS } from "./server-methods/prometheus-methods.js";
+import {
+  PROMETHEUS_GATEWAY_READ_METHODS,
+  PROMETHEUS_GATEWAY_WRITE_METHODS,
+} from "./server-methods/prometheus-methods.js";
 import { prometheusHandlers } from "./server-methods/prometheus.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
@@ -97,6 +100,7 @@ const WRITE_METHODS = new Set([
   "chat.send",
   "chat.abort",
   "browser.request",
+  ...PROMETHEUS_GATEWAY_WRITE_METHODS,
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {

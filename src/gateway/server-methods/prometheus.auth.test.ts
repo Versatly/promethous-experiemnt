@@ -2,16 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { listGatewayMethods } from "../server-methods-list.js";
 import { handleGatewayRequest } from "../server-methods.js";
-import { PROMETHEUS_GATEWAY_READ_METHODS } from "./prometheus-methods.js";
+import {
+  PROMETHEUS_GATEWAY_METHODS,
+  PROMETHEUS_GATEWAY_READ_METHODS,
+  PROMETHEUS_GATEWAY_WRITE_METHODS,
+} from "./prometheus-methods.js";
 
 const READ_METHODS = PROMETHEUS_GATEWAY_READ_METHODS;
+const WRITE_METHODS = PROMETHEUS_GATEWAY_WRITE_METHODS;
+const ALL_METHODS = PROMETHEUS_GATEWAY_METHODS;
 
 describe("PROMETHEUS gateway authorization", () => {
   it("covers every prometheus.* method exposed in gateway method list", () => {
     const prometheusMethods = listGatewayMethods()
       .filter((method) => method.startsWith("prometheus."))
       .toSorted();
-    expect(prometheusMethods).toEqual([...READ_METHODS].toSorted());
+    expect(prometheusMethods).toEqual([...ALL_METHODS].toSorted());
+    expect(new Set([...READ_METHODS, ...WRITE_METHODS]).size).toBe(ALL_METHODS.length);
   });
 
   it.each(READ_METHODS)("allows operator.read scope for %s", async (method) => {
@@ -110,6 +117,37 @@ describe("PROMETHEUS gateway authorization", () => {
       return;
     }
     expect(ok).toBe(true);
+  });
+
+  it("requires operator.write scope for all prometheus write methods", async () => {
+    for (const method of WRITE_METHODS as ReadonlyArray<string>) {
+      const respond = vi.fn();
+      await handleGatewayRequest({
+        req: {
+          type: "req",
+          id: `write-required-${method}`,
+          method,
+          params: {},
+        },
+        client: {
+          connect: {
+            role: "operator",
+            scopes: ["operator.read"],
+          },
+        },
+        isWebchatConnect: () => false,
+        respond,
+        context: {} as GatewayRequestContext,
+      });
+
+      expect(respond).toHaveBeenCalledWith(
+        false,
+        undefined,
+        expect.objectContaining({
+          message: expect.stringContaining("operator.write"),
+        }),
+      );
+    }
   });
 
   it.each(READ_METHODS)("rejects node role access for %s", async (method) => {
