@@ -106,6 +106,42 @@ describe("PROMETHEUS gateway authorization planned mutating guardrails", () => {
     }
   });
 
+  it("does not dispatch injected handlers when planned methods are env-enabled", async () => {
+    vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
+    const method = "prometheus.control.execute";
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const respond = vi.fn();
+    await runPrometheusWriteRequest({
+      request: {
+        id: "planned-method-env-enabled-short-circuit-before-handler-dispatch",
+        method,
+        params: {},
+      },
+      respond,
+      extraHandlers: {
+        [method]: plannedExecuteHandler,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.notImplementedMessage,
+      }),
+    );
+    expect(plannedExecuteHandler).not.toHaveBeenCalled();
+  });
+
   it("invokes planned-method auth resolvers only for requested planned method", async () => {
     const method = "prometheus.control.execute";
     const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
