@@ -16,9 +16,13 @@ import {
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   type PrometheusGatewayMethodMetadata,
 } from "./prometheus-methods.js";
-import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
+import {
+  buildPrometheusControlCatalogSnapshot,
+  type PrometheusControlCatalogSnapshot,
+} from "./prometheus.control-catalog.js";
 import {
   runPrometheusControlPreview,
+  type PrometheusControlPreviewResult,
   type PrometheusControlPreviewDeps,
 } from "./prometheus.control-preview.js";
 import {
@@ -47,6 +51,53 @@ export function assertPrometheusHandlerContract(args: {
   ) {
     throw new Error("PROMETHEUS handler contract mismatch: handlers and metadata keys diverged");
   }
+}
+
+function isPrometheusControlCatalogSnapshot(
+  value: unknown,
+): value is PrometheusControlCatalogSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<PrometheusControlCatalogSnapshot>;
+  return (
+    typeof candidate.ts === "number" &&
+    !!candidate.summary &&
+    typeof candidate.summary === "object" &&
+    !!candidate.guardrails &&
+    typeof candidate.guardrails === "object" &&
+    Array.isArray(candidate.methods) &&
+    !!candidate.controlPreview &&
+    typeof candidate.controlPreview === "object" &&
+    candidate.controlPreview.method === "prometheus.control.preview" &&
+    Array.isArray(candidate.controlPreview.actions)
+  );
+}
+
+function isPrometheusControlPreviewResult(value: unknown): value is PrometheusControlPreviewResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<PrometheusControlPreviewResult>;
+  if (candidate.ok === true) {
+    return (
+      !!candidate.payload &&
+      typeof candidate.payload === "object" &&
+      typeof candidate.payload.ts === "number" &&
+      typeof candidate.payload.action === "string" &&
+      typeof candidate.payload.mutatesState === "boolean" &&
+      "preview" in candidate.payload
+    );
+  }
+  if (candidate.ok === false) {
+    return (
+      !!candidate.error &&
+      typeof candidate.error === "object" &&
+      typeof candidate.error.code === "string" &&
+      typeof candidate.error.message === "string"
+    );
+  }
+  return false;
 }
 
 type PrometheusHandlersDeps = {
@@ -396,6 +447,9 @@ export function createPrometheusHandlers(deps?: PrometheusHandlersDeps): Gateway
     "prometheus.control.catalog": async ({ respond }) => {
       try {
         const catalog = buildControlCatalogSnapshot();
+        if (!isPrometheusControlCatalogSnapshot(catalog)) {
+          throw new Error("Invalid control catalog snapshot shape from handler dependency");
+        }
         respond(true, catalog, undefined);
       } catch (error) {
         respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
@@ -404,6 +458,9 @@ export function createPrometheusHandlers(deps?: PrometheusHandlersDeps): Gateway
     "prometheus.control.preview": async ({ respond, params }) => {
       try {
         const result = await runControlPreview(params, controlPreviewDeps);
+        if (!isPrometheusControlPreviewResult(result)) {
+          throw new Error("Invalid control preview result shape from handler dependency");
+        }
         if (!result.ok) {
           respond(false, undefined, errorShape(result.error.code, result.error.message));
           return;

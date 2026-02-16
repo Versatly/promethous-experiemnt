@@ -792,6 +792,34 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected catalog snapshot shape is invalid", async () => {
+    const handlers = createPrometheusHandlers({
+      buildControlCatalogSnapshot: () => ({ ts: Date.now() }) as never,
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.catalog"]({
+      req: {
+        type: "req",
+        id: "control-catalog-invalid-shape",
+        method: "prometheus.control.catalog",
+      },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
 });
 
 describe("prometheusHandlers.prometheus.control.preview", () => {
@@ -1056,6 +1084,36 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
         message: expect.stringContaining("control preview dependency exploded"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected control preview result shape is invalid", async () => {
+    const handlers = createPrometheusHandlers({
+      runControlPreview: async () => ({ ok: true }) as never,
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "control-preview-invalid-shape",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control preview result shape"),
       }),
     );
   });
