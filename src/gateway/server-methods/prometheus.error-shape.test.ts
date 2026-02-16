@@ -60,7 +60,7 @@ describe("prometheus handler error shape parity", () => {
 
     expect(codes.length).toBe(methods.length);
     expect(new Set(codes).size).toBe(1);
-    expect(codes[0]).not.toBe(ErrorCodes.INVALID_REQUEST);
+    expect(codes[0]).toBe(ErrorCodes.UNAVAILABLE);
   });
 
   it("uses INVALID_REQUEST for trajectory validation failures", async () => {

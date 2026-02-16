@@ -90,7 +90,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         undefined,
       );
     } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
     }
   },
   "prometheus.trajectory": async ({ respond, params }) => {
@@ -161,7 +161,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         undefined,
       );
     } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
     }
   },
   "prometheus.goals": async ({ respond, params }) => {
@@ -200,7 +200,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         undefined,
       );
     } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
     }
   },
   "prometheus.recursion": async ({ respond, params }) => {
@@ -249,7 +249,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         undefined,
       );
     } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
     }
   },
   "prometheus.autarch": async ({ respond, params }) => {
@@ -350,7 +350,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         undefined,
       );
     } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
     }
   },
   "prometheus.monolith": async ({ respond, params }) => {
@@ -464,7 +464,7 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         undefined,
       );
     } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
     }
   },
 };
