@@ -885,6 +885,67 @@ describe("PROMETHEUS gateway authorization", () => {
     );
   });
 
+  it("returns UNAVAILABLE when injected preview dependency violates HELIOS divergence-severity contract at request level", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "preview-helios-divergence-severity-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action: "helios.trajectory-evaluation",
+          goalId: "goal-1",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: async () =>
+          ({
+            ok: true,
+            payload: {
+              ts: Date.now(),
+              action: "helios.trajectory-evaluation",
+              mutatesState: false,
+              preview: {
+                goalId: "goal-1",
+                goalStatus: "active",
+                computedSnapshot: {
+                  at: Date.now(),
+                  completionRatio: 0.4,
+                  blockedRatio: 0.1,
+                  score: 0.6,
+                },
+                priorWindowSize: 2,
+                divergence: {
+                  severity: "critical",
+                  reason: "invalid severity",
+                  scoreDrop: 0.3,
+                  latestScore: 0.6,
+                },
+              },
+            },
+          }) as never,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
+
   it("returns UNAVAILABLE when injected preview dependency violates bounded recursion invariants at request level", async () => {
     const respond = vi.fn();
     await handleGatewayRequest({
