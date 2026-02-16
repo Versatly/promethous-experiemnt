@@ -12,16 +12,33 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+function createClientForwardingHandler(args: {
+  expectedClient: {
+    connect: {
+      role: string;
+      scopes: string[];
+    };
+  };
+  expectedContext?: GatewayRequestContext;
+}) {
+  return vi.fn(async ({ client, context: receivedContext, respond }) => {
+    expect(client).toEqual(args.expectedClient);
+    if (args.expectedContext) {
+      expect(receivedContext).toBe(args.expectedContext);
+    }
+    respond(true, { ok: true }, undefined);
+  });
+}
+
 describe("prometheus request test helpers (forwarding)", () => {
   it("forwards default node role/scopes into extra handlers", async () => {
-    const nodeEventHandler = vi.fn(async ({ client, respond }) => {
-      expect(client).toEqual({
+    const nodeEventHandler = createClientForwardingHandler({
+      expectedClient: {
         connect: {
           role: "node",
           scopes: ["operator.read"],
         },
-      });
-      respond(true, { ok: true }, undefined);
+      },
     });
     const respond = vi.fn();
     await runPrometheusNodeRequest({
@@ -67,14 +84,13 @@ describe("prometheus request test helpers (forwarding)", () => {
   });
 
   it("forwards default write client role/scopes into extra handlers", async () => {
-    const statusHandler = vi.fn(async ({ client, respond }) => {
-      expect(client).toEqual({
+    const statusHandler = createClientForwardingHandler({
+      expectedClient: {
         connect: {
           role: "operator",
           scopes: ["operator.write"],
         },
-      });
-      respond(true, { ok: true }, undefined);
+      },
     });
     const respond = vi.fn();
     await runPrometheusWriteRequest({
@@ -94,14 +110,13 @@ describe("prometheus request test helpers (forwarding)", () => {
   });
 
   it("forwards default read client scopes into extra handlers", async () => {
-    const statusHandler = vi.fn(async ({ client, respond }) => {
-      expect(client).toEqual({
+    const statusHandler = createClientForwardingHandler({
+      expectedClient: {
         connect: {
           role: "operator",
           scopes: ["operator.read"],
         },
-      });
-      respond(true, { ok: true }, undefined);
+      },
     });
     const respond = vi.fn();
     await runPrometheusReadRequest({
@@ -122,15 +137,14 @@ describe("prometheus request test helpers (forwarding)", () => {
 
   it("forwards explicit context and custom scopes into extra handlers", async () => {
     const context = { marker: "request-helper-context" } as GatewayRequestContext;
-    const statusHandler = vi.fn(async ({ client, context: receivedContext, respond }) => {
-      expect(client).toEqual({
+    const statusHandler = createClientForwardingHandler({
+      expectedClient: {
         connect: {
           role: "operator",
           scopes: ["operator.read", "operator.write"],
         },
-      });
-      expect(receivedContext).toBe(context);
-      respond(true, { ok: true }, undefined);
+      },
+      expectedContext: context,
     });
     const respond = vi.fn();
     await runPrometheusOperatorRequest({
@@ -153,15 +167,14 @@ describe("prometheus request test helpers (forwarding)", () => {
 
   it("forwards custom scopes and context for node helper requests", async () => {
     const context = { marker: "node-helper-context" } as GatewayRequestContext;
-    const nodeEventHandler = vi.fn(async ({ client, context: receivedContext, respond }) => {
-      expect(client).toEqual({
+    const nodeEventHandler = createClientForwardingHandler({
+      expectedClient: {
         connect: {
           role: "node",
           scopes: ["operator.write"],
         },
-      });
-      expect(receivedContext).toBe(context);
-      respond(true, { ok: true }, undefined);
+      },
+      expectedContext: context,
     });
     const respond = vi.fn();
     await runPrometheusNodeRequest({
