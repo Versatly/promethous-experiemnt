@@ -1048,4 +1048,114 @@ describe("PROMETHEUS gateway authorization", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected catalog dependency diverges planned preflight contract at request level", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "catalog-planned-preflight-divergence-request-level",
+        method: "prometheus.control.catalog",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        buildControlCatalogSnapshot: () => {
+          const snapshot = buildPrometheusControlCatalogSnapshot();
+          return {
+            ...snapshot,
+            guardrails: {
+              ...snapshot.guardrails,
+              plannedMutatingPreviewActions: snapshot.guardrails.plannedMutatingPreviewActions.map(
+                (action, index) =>
+                  index === 0
+                    ? {
+                        ...action,
+                        preflight: {
+                          ...action.preflight,
+                          disabledMessage: "DIVERGENT disabled message",
+                        },
+                      }
+                    : action,
+              ),
+            },
+          } as never;
+        },
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
+
+  it("keeps planned-action canonical metadata fallback at request level when injected metadata resolver returns malformed shape", async () => {
+    const action = "autarch.gap-detection.commit";
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action,
+      metadata,
+    });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-action-malformed-metadata-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action,
+          goalId: "goal-1",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: (params, deps) =>
+          runPrometheusControlPreview(params, {
+            ...deps,
+            resolvePlannedActionMetadata: () =>
+              ({
+                mutatesState: true,
+                enabled: false,
+                enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+                requiredParams: ["goalId", "goalId"],
+                reason: "invalid required params",
+              }) as never,
+          }),
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
 });
