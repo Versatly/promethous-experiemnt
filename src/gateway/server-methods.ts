@@ -17,6 +17,7 @@ import { nodeHandlers } from "./server-methods/nodes.js";
 import {
   arePrometheusMutatingControlsEnabled,
   getPrometheusGatewayMethodMetadata,
+  type PrometheusGatewayMethodMetadata,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./server-methods/prometheus-methods.js";
@@ -111,6 +112,30 @@ const WRITE_METHODS = new Set([
   ...PROMETHEUS_WRITE_METHODS,
 ]);
 
+function mutatingControlsDisabledError() {
+  return errorShape(
+    ErrorCodes.UNAVAILABLE,
+    `prometheus mutating controls are disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable)`,
+  );
+}
+
+export function getPrometheusMutatingControlGuardError(args: {
+  method: string;
+  env?: NodeJS.ProcessEnv;
+  resolveMethodMetadata?: (method: string) => PrometheusGatewayMethodMetadata | undefined;
+}) {
+  const {
+    method,
+    env = process.env,
+    resolveMethodMetadata = getPrometheusGatewayMethodMetadata,
+  } = args;
+  const methodMetadata = resolveMethodMetadata(method);
+  if (methodMetadata?.mutatesState !== true) {
+    return undefined;
+  }
+  return arePrometheusMutatingControlsEnabled(env) ? undefined : mutatingControlsDisabledError();
+}
+
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
   if (!client?.connect) {
     return null;
@@ -129,12 +154,9 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   if (role !== "operator") {
     return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${role}`);
   }
-  const prometheusMethodMetadata = getPrometheusGatewayMethodMetadata(method);
-  if (prometheusMethodMetadata?.mutatesState === true && !arePrometheusMutatingControlsEnabled()) {
-    return errorShape(
-      ErrorCodes.UNAVAILABLE,
-      `prometheus mutating controls are disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable)`,
-    );
+  const mutatingControlGuardError = getPrometheusMutatingControlGuardError({ method });
+  if (mutatingControlGuardError) {
+    return mutatingControlGuardError;
   }
   if (scopes.includes(ADMIN_SCOPE)) {
     return null;

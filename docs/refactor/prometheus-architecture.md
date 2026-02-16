@@ -180,7 +180,8 @@ Handler coverage is fail-fast checked at module load (`assertPrometheusHandlerCo
 metadata and implemented `prometheus.*` handlers cannot silently drift.
 Future mutating control methods are additionally gated by
 `OPENCLAW_PROMETHEUS_MUTATING_CONTROLS=1`; `prometheus.control.catalog` exposes this guardrail
-state and lists any currently mutating methods/actions.
+state and lists any currently mutating methods/actions. Gateway authorization enforces this through
+`getPrometheusMutatingControlGuardError`.
 
 ## Scope boundaries
 
