@@ -1,0 +1,50 @@
+import { describe, expect, it } from "vitest";
+import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
+import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
+
+describe("prometheus control catalog builder", () => {
+  it("builds a consistent snapshot with summary counts", () => {
+    const snapshot = buildPrometheusControlCatalogSnapshot({ now: 123, env: {} });
+
+    expect(snapshot.ts).toBe(123);
+    expect(snapshot.summary.totalMethods).toBe(snapshot.methods.length);
+    expect(snapshot.summary.readMethods + snapshot.summary.writeMethods).toBe(
+      snapshot.methods.length,
+    );
+    expect(snapshot.summary.mutatingMethods).toBe(snapshot.guardrails.mutatingMethods.length);
+    expect(snapshot.summary.plannedMutatingMethods).toBe(
+      snapshot.guardrails.plannedMutatingMethods.length,
+    );
+    expect(snapshot.summary.previewActions).toBe(snapshot.controlPreview.actions.length);
+    expect(snapshot.summary.mutatingPreviewActions).toBe(
+      snapshot.guardrails.mutatingPreviewActions.length,
+    );
+    expect(snapshot.summary.plannedMutatingPreviewActions).toBe(
+      snapshot.guardrails.plannedMutatingPreviewActions.length,
+    );
+    expect(snapshot.guardrails.enableEnvVar).toBe(PROMETHEUS_MUTATING_CONTROLS_ENV);
+    expect(snapshot.guardrails.mutationsEnabled).toBe(false);
+  });
+
+  it("reports mutationsEnabled=true when guardrail env is enabled", () => {
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: { [PROMETHEUS_MUTATING_CONTROLS_ENV]: "1" },
+    });
+    expect(snapshot.guardrails.mutationsEnabled).toBe(true);
+  });
+
+  it("keeps planned mutating entries disjoint from active catalog entries", () => {
+    const snapshot = buildPrometheusControlCatalogSnapshot({ env: {} });
+    const activeMethods = new Set(snapshot.methods.map((method) => method.method));
+    const plannedMethods = snapshot.guardrails.plannedMutatingMethods.map(
+      (method) => method.method,
+    );
+    const activeActions = new Set(snapshot.controlPreview.actions.map((action) => action.action));
+    const plannedActions = snapshot.guardrails.plannedMutatingPreviewActions.map(
+      (action) => action.action,
+    );
+
+    expect(plannedMethods.every((method) => !activeMethods.has(method))).toBe(true);
+    expect(plannedActions.every((action) => !activeActions.has(action))).toBe(true);
+  });
+});

@@ -13,22 +13,11 @@ import {
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
 import {
-  arePrometheusMutatingControlsEnabled,
-  listPrometheusMutatingMethods,
-  listPrometheusPlannedMutatingMethods,
-  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
-  PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   type PrometheusGatewayMethodMetadata,
 } from "./prometheus-methods.js";
-import {
-  listPrometheusPlannedMutatingPreviewActions,
-  listPrometheusMutatingPreviewActions,
-  PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
-  PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
-  PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
-  runPrometheusControlPreview,
-} from "./prometheus.control-preview.js";
+import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
+import { runPrometheusControlPreview } from "./prometheus.control-preview.js";
 import {
   CAPITAL_FORMS,
   type CapitalForm,
@@ -387,59 +376,8 @@ export const prometheusHandlers: GatewayRequestHandlers = {
   },
   "prometheus.control.catalog": async ({ respond }) => {
     try {
-      const methods = Object.entries(PROMETHEUS_GATEWAY_METHOD_METADATA)
-        .toSorted(([left], [right]) => left.localeCompare(right))
-        .map(([method, metadata]) => ({
-          method,
-          access: metadata.access,
-          mutatesState: metadata.mutatesState,
-        }));
-      const actions = [...PROMETHEUS_CONTROL_PREVIEW_ACTIONS].map((action) => ({
-        action,
-        ...PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action],
-      }));
-      const mutatingMethods = listPrometheusMutatingMethods();
-      const plannedMutatingMethods = listPrometheusPlannedMutatingMethods();
-      const mutatingPreviewActions = listPrometheusMutatingPreviewActions();
-      const plannedMutatingPreviewActions = listPrometheusPlannedMutatingPreviewActions();
-      const mutationsEnabled = arePrometheusMutatingControlsEnabled();
-      const summary = {
-        totalMethods: methods.length,
-        readMethods: methods.filter((method) => method.access === "read").length,
-        writeMethods: methods.filter((method) => method.access === "write").length,
-        mutatingMethods: mutatingMethods.length,
-        plannedMutatingMethods: plannedMutatingMethods.length,
-        previewActions: actions.length,
-        mutatingPreviewActions: mutatingPreviewActions.length,
-        plannedMutatingPreviewActions: plannedMutatingPreviewActions.length,
-      };
-      respond(
-        true,
-        {
-          ts: Date.now(),
-          summary,
-          guardrails: {
-            mutationsEnabled,
-            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
-            mutatingMethods,
-            mutatingPreviewActions,
-            plannedMutatingMethods: plannedMutatingMethods.map((method) => ({
-              method,
-              ...PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method],
-            })),
-            plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => ({
-              action,
-              ...PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA[action],
-            })),
-          },
-          methods,
-          controlPreview: {
-            method: "prometheus.control.preview",
-            actions,
-          },
-        },
-        undefined,
-      );
+      const catalog = buildPrometheusControlCatalogSnapshot();
+      respond(true, catalog, undefined);
     } catch (error) {
       respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
     }
