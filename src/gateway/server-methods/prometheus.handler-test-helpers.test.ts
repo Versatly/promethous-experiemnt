@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { GatewayRequestContext, GatewayRequestHandlers } from "./types.js";
 import { ErrorCodes } from "../protocol/index.js";
 import {
   runPrometheusControlCatalogHandler,
@@ -57,6 +58,75 @@ describe("prometheus handler test helpers", () => {
         action: "autarch.gap-detection",
         mutatesState: false,
       }),
+      undefined,
+    );
+  });
+
+  it("forwards method, params, and context through generic helper", async () => {
+    const context = { marker: "ctx" } as GatewayRequestContext;
+    const handler = vi.fn(async ({ req, params, context: receivedContext, respond }) => {
+      expect(req.id).toBe("handler-helper-generic-forwarding");
+      expect(req.method).toBe("prometheus.status");
+      expect(params).toEqual({ stateDir: "/tmp/state-dir" });
+      expect(receivedContext).toBe(context);
+      respond(true, { ok: true }, undefined);
+    });
+    const handlers: GatewayRequestHandlers = {
+      "prometheus.status": handler,
+    };
+    const respond = vi.fn();
+    await runPrometheusHandler({
+      handlers,
+      method: "prometheus.status",
+      requestId: "handler-helper-generic-forwarding",
+      params: { stateDir: "/tmp/state-dir" },
+      context,
+      respond,
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
+  });
+
+  it("delegates control wrapper helpers to canonical method keys", async () => {
+    const catalogHandler = vi.fn(async ({ req, respond }) => {
+      expect(req.method).toBe("prometheus.control.catalog");
+      respond(true, { method: req.method }, undefined);
+    });
+    const previewHandler = vi.fn(async ({ req, params, respond }) => {
+      expect(req.method).toBe("prometheus.control.preview");
+      expect(params).toEqual({ action: "autarch.gap-detection" });
+      respond(true, { method: req.method }, undefined);
+    });
+    const handlers: GatewayRequestHandlers = {
+      "prometheus.control.catalog": catalogHandler,
+      "prometheus.control.preview": previewHandler,
+    };
+
+    const catalogRespond = vi.fn();
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "handler-helper-wrapper-catalog",
+      respond: catalogRespond,
+    });
+    expect(catalogHandler).toHaveBeenCalledTimes(1);
+    expect(catalogRespond).toHaveBeenCalledWith(
+      true,
+      { method: "prometheus.control.catalog" },
+      undefined,
+    );
+
+    const previewRespond = vi.fn();
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "handler-helper-wrapper-preview",
+      params: { action: "autarch.gap-detection" },
+      respond: previewRespond,
+    });
+    expect(previewHandler).toHaveBeenCalledTimes(1);
+    expect(previewRespond).toHaveBeenCalledWith(
+      true,
+      { method: "prometheus.control.preview" },
       undefined,
     );
   });
