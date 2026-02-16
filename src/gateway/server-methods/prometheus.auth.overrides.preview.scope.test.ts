@@ -44,6 +44,74 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
     expect(buildControlCatalogSnapshot).not.toHaveBeenCalled();
   });
 
+  it("does not invoke injected preview dependencies when write scope is missing", async () => {
+    const runControlPreview = vi.fn(async () => {
+      throw new Error("preview dependency should not run before scope denial");
+    });
+    const buildControlCatalogSnapshot = vi.fn(() => {
+      throw new Error("catalog dependency should not run before scope denial");
+    });
+    const respond = vi.fn();
+    await runPrometheusOperatorRequest({
+      request: {
+        id: "missing-write-scope-short-circuit-preview-deps",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      },
+      respond,
+      scopes: ["operator.read"],
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview,
+        buildControlCatalogSnapshot,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("missing scope: operator.write"),
+      }),
+    );
+    expect(runControlPreview).not.toHaveBeenCalled();
+    expect(buildControlCatalogSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("does not invoke injected catalog dependencies when read scope is missing", async () => {
+    const runControlPreview = vi.fn(async () => {
+      throw new Error("preview dependency should not run before scope denial");
+    });
+    const buildControlCatalogSnapshot = vi.fn(() => {
+      throw new Error("catalog dependency should not run before scope denial");
+    });
+    const respond = vi.fn();
+    await runPrometheusOperatorRequest({
+      request: {
+        id: "missing-read-scope-short-circuit-catalog-deps",
+        method: "prometheus.control.catalog",
+        params: {},
+      },
+      respond,
+      scopes: [],
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview,
+        buildControlCatalogSnapshot,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("missing scope: operator.read"),
+      }),
+    );
+    expect(runControlPreview).not.toHaveBeenCalled();
+    expect(buildControlCatalogSnapshot).not.toHaveBeenCalled();
+  });
+
   it("invokes planned-action resolvers once for planned action request path", async () => {
     const action = "autarch.gap-detection.commit";
     const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
