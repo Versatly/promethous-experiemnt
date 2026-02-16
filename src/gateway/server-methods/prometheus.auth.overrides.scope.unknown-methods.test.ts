@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createThrowingPrometheusAuthOverrides,
+  expectNoPrometheusAuthOverrideInvocations,
+} from "./prometheus.auth.overrides.scope.test-helpers.js";
+import {
   runPrometheusNodeRequest,
   runPrometheusOperatorRequest,
   runPrometheusRoleRequest,
@@ -7,38 +11,13 @@ import {
 
 const UNKNOWN_PROMETHEUS_METHOD = "prometheus.unknown.gateway.method";
 
-function createThrowingAuthOverrides(prefix: string) {
-  const resolvePrometheusMethodMetadata = vi.fn(() => {
-    throw new Error(`${prefix}: method metadata resolver should not be called`);
-  });
-  const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
-    throw new Error(`${prefix}: planned metadata resolver should not be called`);
-  });
-  const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
-    throw new Error(`${prefix}: planned preflight resolver should not be called`);
-  });
-  return {
-    resolvePrometheusMethodMetadata,
-    resolvePrometheusPlannedMethodMetadata,
-    resolvePrometheusPlannedMethodPreflight,
-  };
-}
-
-function expectNoAuthOverrideInvocations(
-  overrides: ReturnType<typeof createThrowingAuthOverrides>,
-) {
-  expect(overrides.resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
-  expect(overrides.resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
-  expect(overrides.resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
-}
-
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
 describe("PROMETHEUS gateway authorization override invocation scope (unknown methods)", () => {
   it("does not invoke PROMETHEUS auth overrides for unknown prometheus-prefixed methods", async () => {
-    const authOverrides = createThrowingAuthOverrides("unknown methods");
+    const authOverrides = createThrowingPrometheusAuthOverrides("unknown methods");
     const respond = vi.fn();
     await runPrometheusOperatorRequest({
       request: {
@@ -58,14 +37,14 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
         message: `unknown method: ${UNKNOWN_PROMETHEUS_METHOD}`,
       }),
     );
-    expectNoAuthOverrideInvocations(authOverrides);
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("does not dispatch injected unknown handlers when unknown method is scope-denied", async () => {
     const unknownMethodHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("unknown scope-denied method");
+    const authOverrides = createThrowingPrometheusAuthOverrides("unknown scope-denied method");
     const respond = vi.fn();
     await runPrometheusOperatorRequest({
       request: {
@@ -89,14 +68,14 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       }),
     );
     expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoAuthOverrideInvocations(authOverrides);
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("dispatches injected unknown handlers under admin scope without invoking PROMETHEUS auth overrides", async () => {
     const unknownMethodHandler = vi.fn(async ({ respond }) => {
       respond(true, { deliveredByExtraHandler: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("unknown admin method");
+    const authOverrides = createThrowingPrometheusAuthOverrides("unknown admin method");
     const respond = vi.fn();
     await runPrometheusOperatorRequest({
       request: {
@@ -114,14 +93,14 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
 
     expect(respond).toHaveBeenCalledWith(true, { deliveredByExtraHandler: true }, undefined);
     expect(unknownMethodHandler).toHaveBeenCalledTimes(1);
-    expectNoAuthOverrideInvocations(authOverrides);
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("does not dispatch injected unknown handlers when node role is denied", async () => {
     const unknownMethodHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("node-denied unknown method");
+    const authOverrides = createThrowingPrometheusAuthOverrides("node-denied unknown method");
     const respond = vi.fn();
     await runPrometheusNodeRequest({
       request: {
@@ -144,14 +123,14 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       }),
     );
     expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoAuthOverrideInvocations(authOverrides);
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("does not dispatch injected unknown handlers when non-operator role is denied", async () => {
     const unknownMethodHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("non-operator unknown method");
+    const authOverrides = createThrowingPrometheusAuthOverrides("non-operator unknown method");
     const respond = vi.fn();
     await runPrometheusRoleRequest({
       role: "auditor",
@@ -175,14 +154,14 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       }),
     );
     expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoAuthOverrideInvocations(authOverrides);
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("does not dispatch injected unknown handlers when runtime role value is malformed", async () => {
     const unknownMethodHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("malformed unknown role");
+    const authOverrides = createThrowingPrometheusAuthOverrides("malformed unknown role");
     const respond = vi.fn();
     await runPrometheusRoleRequest({
       role: 7 as never,
@@ -206,6 +185,6 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       }),
     );
     expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoAuthOverrideInvocations(authOverrides);
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 });

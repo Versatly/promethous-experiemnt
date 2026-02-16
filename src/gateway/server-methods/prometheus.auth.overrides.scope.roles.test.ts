@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createThrowingPrometheusAuthOverrides,
+  expectNoPrometheusAuthOverrideInvocations,
+} from "./prometheus.auth.overrides.scope.test-helpers.js";
+import {
   runPrometheusNodeRequest,
   runPrometheusRoleRequest,
 } from "./prometheus.request-test-helpers.js";
@@ -8,26 +12,9 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function createThrowingAuthOverrides(prefix: string) {
-  const resolvePrometheusMethodMetadata = vi.fn(() => {
-    throw new Error(`${prefix}: method metadata resolver should not be called`);
-  });
-  const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
-    throw new Error(`${prefix}: planned metadata resolver should not be called`);
-  });
-  const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
-    throw new Error(`${prefix}: planned preflight resolver should not be called`);
-  });
-  return {
-    resolvePrometheusMethodMetadata,
-    resolvePrometheusPlannedMethodMetadata,
-    resolvePrometheusPlannedMethodPreflight,
-  };
-}
-
 describe("PROMETHEUS gateway authorization override invocation scope (role short-circuits)", () => {
   it("does not invoke PROMETHEUS auth overrides when role short-circuit denies node clients", async () => {
-    const authOverrides = createThrowingAuthOverrides("node role");
+    const authOverrides = createThrowingPrometheusAuthOverrides("node role");
     const respond = vi.fn();
     await runPrometheusNodeRequest({
       request: {
@@ -46,9 +33,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
         message: expect.stringContaining("unauthorized role: node"),
       }),
     );
-    expect(authOverrides.resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("does not dispatch planned-method extra handlers when node role is denied", async () => {
@@ -56,7 +41,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
     const plannedExecuteHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("node role");
+    const authOverrides = createThrowingPrometheusAuthOverrides("node role");
     const respond = vi.fn();
     await runPrometheusNodeRequest({
       request: {
@@ -79,9 +64,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
       }),
     );
     expect(plannedExecuteHandler).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("does not dispatch extra handlers when non-operator/non-node role is denied", async () => {
@@ -89,7 +72,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
     const plannedExecuteHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("non-operator role");
+    const authOverrides = createThrowingPrometheusAuthOverrides("non-operator role");
     const respond = vi.fn();
     await runPrometheusRoleRequest({
       role: "auditor",
@@ -113,9 +96,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
       }),
     );
     expect(plannedExecuteHandler).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
   it("does not dispatch extra handlers when runtime role value is malformed", async () => {
@@ -123,7 +104,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
     const plannedExecuteHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
     });
-    const authOverrides = createThrowingAuthOverrides("malformed role");
+    const authOverrides = createThrowingPrometheusAuthOverrides("malformed role");
     const respond = vi.fn();
     await runPrometheusRoleRequest({
       role: 7 as never,
@@ -147,8 +128,6 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
       }),
     );
     expect(plannedExecuteHandler).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
-    expect(authOverrides.resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 });
