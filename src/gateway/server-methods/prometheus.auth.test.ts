@@ -106,6 +106,55 @@ describe("PROMETHEUS gateway authorization", () => {
     );
   });
 
+  it("ignores planned-method auth overrides on non-planned request paths", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-override-on-non-planned-method",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodMetadata: () =>
+          ({
+            access: "write",
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+            requiredParams: ["action"],
+            reason: "should not affect non-planned method",
+          }) as never,
+        resolvePrometheusPlannedMethodPreflight: () =>
+          ({
+            disabledMessage: "should not be used",
+            notImplementedMessage: "should not be used",
+            requiredParamsMessage: "should not be used",
+          }) as never,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        action: "autarch.gap-detection",
+        mutatesState: false,
+      }),
+      undefined,
+    );
+  });
+
   it.each(READ_METHODS)("rejects missing read scope for %s", async (method) => {
     const respond = vi.fn();
     await handleGatewayRequest({

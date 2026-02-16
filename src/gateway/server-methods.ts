@@ -202,18 +202,20 @@ export function getPrometheusMutatingControlGuardError(args: {
     resolveMethodMetadata = getPrometheusGatewayMethodMetadata,
   } = args;
   const canonicalMethodMetadata = getPrometheusGatewayMethodMetadata(method);
+  if (!canonicalMethodMetadata) {
+    return undefined;
+  }
   const resolvedMethodMetadata = resolveMethodMetadata(method);
   const methodMetadata = isPrometheusGatewayMethodMetadataShape(resolvedMethodMetadata)
     ? resolvedMethodMetadata
     : undefined;
-  const effectiveMethodMetadata =
-    canonicalMethodMetadata && methodMetadata
-      ? methodMetadata.access === canonicalMethodMetadata.access &&
-        methodMetadata.mutatesState === canonicalMethodMetadata.mutatesState
-        ? methodMetadata
-        : canonicalMethodMetadata
-      : (methodMetadata ?? canonicalMethodMetadata);
-  if (effectiveMethodMetadata?.mutatesState !== true) {
+  const effectiveMethodMetadata = methodMetadata
+    ? methodMetadata.access === canonicalMethodMetadata.access &&
+      methodMetadata.mutatesState === canonicalMethodMetadata.mutatesState
+      ? methodMetadata
+      : canonicalMethodMetadata
+    : canonicalMethodMetadata;
+  if (!effectiveMethodMetadata?.mutatesState) {
     return undefined;
   }
   return arePrometheusMutatingControlsEnabled(env) ? undefined : mutatingControlsDisabledError();
@@ -237,6 +239,9 @@ export function getPrometheusPlannedMutatingMethodGuardError(args: {
   } = args;
   const canonicalMetadata = getPrometheusPlannedMutatingMethodMetadata(method);
   const canonicalPreflight = getPrometheusPlannedMutatingMethodPreflight(method);
+  if (!canonicalMetadata && !canonicalPreflight) {
+    return undefined;
+  }
   const resolvedMetadata = resolvePlannedMethodMetadata(method);
   const metadata = isPrometheusPlannedMutatingMethodMetadataShape(resolvedMetadata)
     ? resolvedMetadata
@@ -254,7 +259,7 @@ export function getPrometheusPlannedMutatingMethodGuardError(args: {
         )
         ? metadata
         : canonicalMetadata
-      : (metadata ?? canonicalMetadata);
+      : canonicalMetadata;
   const resolvedPreflight = resolvePlannedMethodPreflight(method);
   const preflight = isPrometheusPlannedMutatingMethodPreflightShape(resolvedPreflight)
     ? resolvedPreflight

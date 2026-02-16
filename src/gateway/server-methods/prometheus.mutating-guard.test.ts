@@ -22,7 +22,7 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toBeUndefined();
   });
 
-  it("blocks mutating methods when env guard is disabled", () => {
+  it("ignores mutating overrides when method is outside canonical metadata", () => {
     const error = getPrometheusMutatingControlGuardError({
       method: "prometheus.control.execute",
       env: {},
@@ -31,12 +31,7 @@ describe("PROMETHEUS mutating-control guard", () => {
         mutatesState: true,
       }),
     });
-    expect(error).toEqual(
-      expect.objectContaining({
-        code: ErrorCodes.UNAVAILABLE,
-        message: expect.stringContaining(PROMETHEUS_MUTATING_CONTROLS_ENV),
-      }),
-    );
+    expect(error).toBeUndefined();
   });
 
   it("allows mutating methods when env guard is explicitly enabled", () => {
@@ -54,6 +49,18 @@ describe("PROMETHEUS mutating-control guard", () => {
   it("prefers canonical metadata when resolver mutability diverges", () => {
     const error = getPrometheusMutatingControlGuardError({
       method: "prometheus.status",
+      env: {},
+      resolveMethodMetadata: () => ({
+        access: "write",
+        mutatesState: true,
+      }),
+    });
+    expect(error).toBeUndefined();
+  });
+
+  it("ignores mutating metadata resolver results for unknown methods", () => {
+    const error = getPrometheusMutatingControlGuardError({
+      method: "prometheus.unknown-method",
       env: {},
       resolveMethodMetadata: () => ({
         access: "write",
@@ -231,6 +238,29 @@ describe("PROMETHEUS mutating-control guard", () => {
         message: canonicalPreflight.disabledMessage,
       }),
     );
+  });
+
+  it("ignores planned metadata/preflight resolver results for non-planned methods", () => {
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.status",
+      env: {},
+      resolvePlannedMethodMetadata: () =>
+        ({
+          access: "write",
+          mutatesState: true,
+          enabled: false,
+          enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+          requiredParams: ["action"],
+          reason: "should be ignored",
+        }) as never,
+      resolvePlannedMethodPreflight: () =>
+        ({
+          disabledMessage: "should be ignored",
+          notImplementedMessage: "should be ignored",
+          requiredParamsMessage: "should be ignored",
+        }) as never,
+    });
+    expect(error).toBeUndefined();
   });
 
   it("does not block methods outside planned mutating metadata", () => {
