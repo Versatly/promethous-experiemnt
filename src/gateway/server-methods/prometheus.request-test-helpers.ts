@@ -16,11 +16,21 @@ type PrometheusScopedRequestArgs = PrometheusOperatorRequestArgs & {
   role?: "operator" | "node";
 };
 
+function resolveRequestMethod(request: PrometheusOperatorRequestArgs["request"]): string {
+  const method = request.method;
+  if (typeof method !== "string" || method.trim().length === 0) {
+    throw new Error("PROMETHEUS request helper requires a non-empty request.method");
+  }
+  return method;
+}
+
 async function runPrometheusScopedRequest(args: PrometheusScopedRequestArgs) {
+  const method = resolveRequestMethod(args.request);
   await handleGatewayRequest({
     req: {
       type: "req",
       ...args.request,
+      method,
     },
     client: {
       connect: {

@@ -293,4 +293,30 @@ describe("prometheus request test helpers", () => {
     expect(nodeEventHandler).toHaveBeenCalledTimes(1);
     expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
   });
+
+  it("throws descriptive error when operator helper request method is blank", async () => {
+    await expect(
+      runPrometheusOperatorRequest({
+        request: {
+          id: "request-helper-invalid-blank-method-operator",
+          method: " ",
+          params: {},
+        },
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
+  });
+
+  it("throws descriptive error when node helper request method is blank", async () => {
+    await expect(
+      runPrometheusNodeRequest({
+        request: {
+          id: "request-helper-invalid-blank-method-node",
+          method: "",
+          params: {},
+        },
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
+  });
 });
