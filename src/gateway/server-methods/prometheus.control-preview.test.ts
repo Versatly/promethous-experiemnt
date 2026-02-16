@@ -23,12 +23,7 @@ import {
   isPrometheusControlPreviewAction,
   runPrometheusControlPreview,
 } from "./prometheus.control-preview.js";
-import {
-  formatPrometheusRequiredParamsMessage,
-  formatPrometheusMissingRequiredParamsMessage,
-  formatPlannedMutatingActionDisabledMessage,
-  formatPlannedMutatingActionNotImplementedMessage,
-} from "./prometheus.preflight-guards.js";
+import { formatPrometheusMissingRequiredParamsMessage } from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -301,6 +296,13 @@ describe("prometheus control preview helpers", () => {
   });
 
   it("returns UNAVAILABLE when planned mutating action is disabled", async () => {
+    const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(
+      "autarch.gap-detection.commit",
+    );
+    expect(preflight).toBeDefined();
+    if (!preflight) {
+      return;
+    }
     const result = await runPrometheusControlPreview({
       action: "autarch.gap-detection.commit",
       goalId: "goal-1",
@@ -309,10 +311,7 @@ describe("prometheus control preview helpers", () => {
       ok: false,
       error: {
         code: ErrorCodes.UNAVAILABLE,
-        message: formatPlannedMutatingActionDisabledMessage(
-          "autarch.gap-detection.commit",
-          PROMETHEUS_MUTATING_CONTROLS_ENV,
-        ),
+        message: preflight.disabledMessage,
       },
     });
   });
@@ -325,25 +324,19 @@ describe("prometheus control preview helpers", () => {
     if (!metadata) {
       return;
     }
+    const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(
+      "autarch.gap-detection.commit",
+    );
+    expect(preflight).toBeDefined();
+    if (!preflight) {
+      return;
+    }
     expect(
       buildPrometheusPlannedMutatingPreviewActionPreflight({
         action: "autarch.gap-detection.commit",
         metadata,
       }),
-    ).toEqual({
-      disabledMessage: formatPlannedMutatingActionDisabledMessage(
-        "autarch.gap-detection.commit",
-        PROMETHEUS_MUTATING_CONTROLS_ENV,
-      ),
-      notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
-        "autarch.gap-detection.commit",
-      ),
-      requiredParamsMessage: formatPrometheusRequiredParamsMessage({
-        kind: "action",
-        name: "autarch.gap-detection.commit",
-        requiredParams: ["goalId"],
-      }),
-    });
+    ).toEqual(preflight);
   });
 
   it("returns planned mutating action preflight only for known actions", () => {
@@ -361,6 +354,13 @@ describe("prometheus control preview helpers", () => {
   });
 
   it("returns UNAVAILABLE for planned mutating actions even when env guard is enabled", async () => {
+    const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(
+      "autarch.gap-detection.commit",
+    );
+    expect(preflight).toBeDefined();
+    if (!preflight) {
+      return;
+    }
     vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
     const result = await runPrometheusControlPreview({
       action: "autarch.gap-detection.commit",
@@ -370,7 +370,38 @@ describe("prometheus control preview helpers", () => {
       ok: false,
       error: {
         code: ErrorCodes.UNAVAILABLE,
-        message: formatPlannedMutatingActionNotImplementedMessage("autarch.gap-detection.commit"),
+        message: preflight.notImplementedMessage,
+      },
+    });
+  });
+
+  it("falls back to metadata when planned-action preflight resolver misses", async () => {
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const fallbackPreflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action: "autarch.gap-detection.commit",
+      metadata,
+    });
+    const result = await runPrometheusControlPreview(
+      {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-1",
+      },
+      {
+        resolvePlannedActionPreflight: () => undefined,
+        resolvePlannedActionMetadata: () => metadata,
+      },
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: fallbackPreflight.disabledMessage,
       },
     });
   });

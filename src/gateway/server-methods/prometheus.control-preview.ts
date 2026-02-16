@@ -284,6 +284,15 @@ export type PrometheusControlPreviewResult =
   | PrometheusControlPreviewSuccess
   | PrometheusControlPreviewFailure;
 
+type PrometheusControlPreviewDeps = {
+  resolvePlannedActionPreflight?: (
+    action: string,
+  ) => PrometheusPlannedMutatingPreviewActionPreflight | undefined;
+  resolvePlannedActionMetadata?: (
+    action: string,
+  ) => PrometheusPlannedMutatingPreviewActionMetadata | undefined;
+};
+
 function isMutationFitnessSnapshotInput(value: unknown): value is MutationFitnessSnapshotInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -347,8 +356,13 @@ export function isPrometheusControlPreviewAction(
 
 export async function runPrometheusControlPreview(
   params: Record<string, unknown>,
+  deps?: PrometheusControlPreviewDeps,
 ): Promise<PrometheusControlPreviewResult> {
   try {
+    const resolvePlannedActionPreflight =
+      deps?.resolvePlannedActionPreflight ?? getPrometheusPlannedMutatingPreviewActionPreflight;
+    const resolvePlannedActionMetadata =
+      deps?.resolvePlannedActionMetadata ?? getPrometheusPlannedMutatingPreviewActionMetadata;
     const rawAction =
       typeof params.action === "string" && params.action.trim().length > 0
         ? params.action.trim()
@@ -357,7 +371,19 @@ export async function runPrometheusControlPreview(
       return invalidRequest("action is required for prometheus.control.preview");
     }
     if (isPrometheusPlannedMutatingPreviewAction(rawAction)) {
-      const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(rawAction);
+      const resolvedPreflight = resolvePlannedActionPreflight(rawAction);
+      const metadata = resolvePlannedActionMetadata(rawAction);
+      if (!resolvedPreflight && !metadata) {
+        return unavailableRequest(formatPlannedMutatingActionNotImplementedMessage(rawAction));
+      }
+      const preflight =
+        resolvedPreflight ??
+        (metadata
+          ? buildPrometheusPlannedMutatingPreviewActionPreflight({
+              action: rawAction,
+              metadata,
+            })
+          : undefined);
       if (!preflight) {
         return unavailableRequest(formatPlannedMutatingActionNotImplementedMessage(rawAction));
       }
