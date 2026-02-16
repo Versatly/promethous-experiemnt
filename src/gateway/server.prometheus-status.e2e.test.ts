@@ -600,4 +600,108 @@ describe("gateway prometheus.status", () => {
     expect(response.error).toBeUndefined();
     ws.close();
   });
+
+  it("keeps status and autarch summary counts consistent in e2e flow", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-consistency-goal",
+        type: "goal.created",
+        occurredAt: 40,
+        payload: {
+          goalId: "goal-consistency",
+          title: "Consistency goal",
+          objective: "Verify parity",
+          priority: 88,
+        },
+      },
+      {
+        id: "evt-consistency-gap",
+        type: "capability-gap.detected",
+        occurredAt: 41,
+        payload: {
+          gapId: "gap-consistency",
+          goalId: "goal-consistency",
+          description: "missing parity capability",
+          severity: "high",
+        },
+      },
+      {
+        id: "evt-consistency-cap",
+        type: "capability-synthesized.recorded",
+        occurredAt: 42,
+        payload: {
+          capabilityId: "cap-consistency",
+          gapId: "gap-consistency",
+          name: "Parity capability",
+          designSpec: "parity-spec",
+          status: "validated",
+        },
+      },
+    ]);
+
+    const { ws } = await harness.openClient();
+    const statusP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-consistency-status",
+      10_000,
+    );
+    const autarchP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-consistency-autarch",
+      10_000,
+    );
+
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-consistency-status",
+        method: "prometheus.status",
+      }),
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-consistency-autarch",
+        method: "prometheus.autarch",
+      }),
+    );
+
+    const statusRes = (await statusP) as {
+      ok?: boolean;
+      payload?: {
+        summary?: {
+          capabilityGaps?: number;
+          unresolvedCapabilityGaps?: number;
+          synthesizedCapabilities?: number;
+        };
+      };
+    };
+    const autarchRes = (await autarchP) as {
+      ok?: boolean;
+      payload?: {
+        summary?: {
+          capabilityGaps?: number;
+          unresolvedCapabilityGaps?: number;
+          synthesizedCapabilities?: number;
+        };
+      };
+    };
+
+    expect(statusRes.ok).toBe(true);
+    expect(autarchRes.ok).toBe(true);
+    expect(statusRes.payload?.summary?.capabilityGaps).toBe(
+      autarchRes.payload?.summary?.capabilityGaps,
+    );
+    expect(statusRes.payload?.summary?.unresolvedCapabilityGaps).toBe(
+      autarchRes.payload?.summary?.unresolvedCapabilityGaps,
+    );
+    expect(statusRes.payload?.summary?.synthesizedCapabilities).toBe(
+      autarchRes.payload?.summary?.synthesizedCapabilities,
+    );
+    ws.close();
+  });
 });
