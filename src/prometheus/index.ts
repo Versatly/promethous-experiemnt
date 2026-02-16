@@ -1,5 +1,6 @@
 export * from "./event-store.js";
 export * from "./events.js";
+export * from "./alignment/guardrails.js";
 export * from "./autarch/cycle.js";
 export * from "./autarch/gap-detection.js";
 export * from "./autarch/pipeline.js";

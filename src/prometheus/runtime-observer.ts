@@ -3,6 +3,7 @@ import type { AgentEventPayload } from "../infra/agent-events.js";
 import type { PrometheusState } from "./state.js";
 import { resolveStateDir } from "../config/paths.js";
 import { onAgentEvent } from "../infra/agent-events.js";
+import { evaluateAlignmentGuardrails } from "./alignment/guardrails.js";
 import { runAutarchGapDetectionCycle } from "./autarch/cycle.js";
 import { createFilePrometheusEventStore, type PrometheusEventStore } from "./event-store.js";
 import {
@@ -41,6 +42,7 @@ export type PrometheusRuntimeObserverOptions = {
   rootGoalIds?: readonly string[];
   trajectoryWindowSize?: number;
   enableAutarchGapDetection?: boolean;
+  enableAlignmentGuardrails?: boolean;
   subscribe?: (listener: (evt: AgentEventPayload) => void) => () => void;
   eventStore?: PrometheusEventStore;
   evaluator?: HeliosTrajectoryEvaluator;
@@ -137,6 +139,8 @@ export function startPrometheusRuntimeObserver(
   const subscribe = options.subscribe ?? onAgentEvent;
   const autarchGapDetectionEnabled =
     options.enableAutarchGapDetection ?? process.env.OPENCLAW_PROMETHEUS_AUTARCH_OBSERVER === "1";
+  const alignmentGuardrailsEnabled =
+    options.enableAlignmentGuardrails ?? process.env.OPENCLAW_PROMETHEUS_ALIGNMENT_OBSERVER === "1";
   let queue: Promise<void> = Promise.resolve();
 
   const evaluate = async (evt: AgentEventPayload) => {
@@ -155,6 +159,21 @@ export function startPrometheusRuntimeObserver(
           runId: evt.runId,
         });
         return;
+      }
+      if (alignmentGuardrailsEnabled) {
+        const guardrails = evaluateAlignmentGuardrails({ state });
+        for (const violation of guardrails.violations) {
+          const meta = {
+            runId: evt.runId,
+            code: violation.code,
+            data: violation.data,
+          };
+          if (violation.severity === "high") {
+            logger.error(violation.message, meta);
+            continue;
+          }
+          logger.warn(violation.message, meta);
+        }
       }
       const results = await evaluator.evaluateGoals({
         state,
