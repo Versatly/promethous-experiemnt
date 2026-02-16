@@ -21,6 +21,8 @@ import {
   type PrometheusControlCatalogSnapshot,
 } from "./prometheus.control-catalog.js";
 import {
+  PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+  isPrometheusControlPreviewAction,
   runPrometheusControlPreview,
   type PrometheusControlPreviewResult,
   type PrometheusControlPreviewDeps,
@@ -63,9 +65,7 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
-function isPrometheusPlannedPreflightShape(
-  value: unknown,
-): value is {
+function isPrometheusPlannedPreflightShape(value: unknown): value is {
   disabledMessage: string;
   notImplementedMessage: string;
   requiredParamsMessage: string;
@@ -92,10 +92,18 @@ function isPrometheusCatalogMethodEntry(
     return false;
   }
   const candidate = value as { method?: unknown; access?: unknown; mutatesState?: unknown };
+  if (typeof candidate.method !== "string") {
+    return false;
+  }
+  const expectedMetadata = PROMETHEUS_GATEWAY_METHOD_METADATA[candidate.method];
+  if (!expectedMetadata) {
+    return false;
+  }
   return (
-    typeof candidate.method === "string" &&
     typeof candidate.access === "string" &&
-    typeof candidate.mutatesState === "boolean"
+    typeof candidate.mutatesState === "boolean" &&
+    candidate.access === expectedMetadata.access &&
+    candidate.mutatesState === expectedMetadata.mutatesState
   );
 }
 
@@ -110,10 +118,18 @@ function isPrometheusCatalogPreviewActionEntry(
     mutatesState?: unknown;
     requiredParams?: unknown;
   };
+  if (typeof candidate.action !== "string" || !isPrometheusControlPreviewAction(candidate.action)) {
+    return false;
+  }
+  const expectedMetadata = PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[candidate.action];
   return (
-    typeof candidate.action === "string" &&
     typeof candidate.mutatesState === "boolean" &&
-    isStringArray(candidate.requiredParams)
+    candidate.mutatesState === expectedMetadata.mutatesState &&
+    isStringArray(candidate.requiredParams) &&
+    candidate.requiredParams.length === expectedMetadata.requiredParams.length &&
+    candidate.requiredParams.every(
+      (param, index) => expectedMetadata.requiredParams[index] === param,
+    )
   );
 }
 
@@ -208,6 +224,16 @@ function isPrometheusControlCatalogSnapshot(
   const controlPreview = candidate.controlPreview as
     | Partial<PrometheusControlCatalogSnapshot["controlPreview"]>
     | undefined;
+  const methods = Array.isArray(candidate.methods) ? candidate.methods : null;
+  const controlPreviewActions = Array.isArray(controlPreview?.actions)
+    ? controlPreview.actions
+    : null;
+  const mutatingMethodsFromMethods = methods
+    ?.filter((method) => method.mutatesState)
+    .map((method) => method.method);
+  const mutatingActionsFromControlPreview = controlPreviewActions
+    ?.filter((action) => action.mutatesState)
+    .map((action) => action.action);
   return (
     isFiniteNumber(candidate.ts) &&
     !!summary &&
@@ -228,12 +254,25 @@ function isPrometheusControlCatalogSnapshot(
     guardrails.plannedMutatingMethods.every(isPrometheusCatalogPlannedMethodEntry) &&
     Array.isArray(guardrails.plannedMutatingPreviewActions) &&
     guardrails.plannedMutatingPreviewActions.every(isPrometheusCatalogPlannedActionEntry) &&
-    Array.isArray(candidate.methods) &&
-    candidate.methods.every(isPrometheusCatalogMethodEntry) &&
+    !!methods &&
+    methods.every(isPrometheusCatalogMethodEntry) &&
     !!controlPreview &&
     controlPreview.method === "prometheus.control.preview" &&
-    Array.isArray(controlPreview.actions) &&
-    controlPreview.actions.every(isPrometheusCatalogPreviewActionEntry)
+    !!controlPreviewActions &&
+    controlPreviewActions.every(isPrometheusCatalogPreviewActionEntry) &&
+    summary.totalMethods === methods.length &&
+    summary.readMethods + summary.writeMethods === summary.totalMethods &&
+    summary.mutatingMethods === mutatingMethodsFromMethods?.length &&
+    summary.plannedMutatingMethods === guardrails.plannedMutatingMethods.length &&
+    summary.previewActions === controlPreviewActions.length &&
+    summary.mutatingPreviewActions === mutatingActionsFromControlPreview?.length &&
+    summary.plannedMutatingPreviewActions === guardrails.plannedMutatingPreviewActions.length &&
+    Array.isArray(guardrails.mutatingMethods) &&
+    guardrails.mutatingMethods.toSorted().join("|") ===
+      (mutatingMethodsFromMethods ?? []).toSorted().join("|") &&
+    Array.isArray(guardrails.mutatingPreviewActions) &&
+    guardrails.mutatingPreviewActions.toSorted().join("|") ===
+      (mutatingActionsFromControlPreview ?? []).toSorted().join("|")
   );
 }
 
@@ -243,13 +282,25 @@ function isPrometheusControlPreviewResult(value: unknown): value is PrometheusCo
   }
   const candidate = value as Partial<PrometheusControlPreviewResult>;
   if (candidate.ok === true) {
+    const payload = candidate.payload as
+      | {
+          ts?: unknown;
+          action?: unknown;
+          mutatesState?: unknown;
+          preview?: unknown;
+        }
+      | undefined;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return false;
+    }
+    if (typeof payload.action !== "string" || !isPrometheusControlPreviewAction(payload.action)) {
+      return false;
+    }
+    const expectedMetadata = PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[payload.action];
     return (
-      !!candidate.payload &&
-      typeof candidate.payload === "object" &&
-      typeof candidate.payload.ts === "number" &&
-      typeof candidate.payload.action === "string" &&
-      typeof candidate.payload.mutatesState === "boolean" &&
-      "preview" in candidate.payload
+      isFiniteNumber(payload.ts) &&
+      payload.mutatesState === expectedMetadata.mutatesState &&
+      "preview" in payload
     );
   }
   if (candidate.ok === false) {

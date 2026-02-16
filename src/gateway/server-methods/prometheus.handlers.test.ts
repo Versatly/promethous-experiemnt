@@ -863,6 +863,43 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected catalog snapshot summary is inconsistent", async () => {
+    const handlers = createPrometheusHandlers({
+      buildControlCatalogSnapshot: () => {
+        const snapshot = buildPrometheusControlCatalogSnapshot();
+        return {
+          ...snapshot,
+          summary: {
+            ...snapshot.summary,
+            totalMethods: snapshot.summary.totalMethods + 1,
+          },
+        } as never;
+      },
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.catalog"]({
+      req: {
+        type: "req",
+        id: "control-catalog-invalid-summary",
+        method: "prometheus.control.catalog",
+      },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
 });
 
 describe("prometheusHandlers.prometheus.control.preview", () => {
@@ -1177,6 +1214,48 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
       req: {
         type: "req",
         id: "control-preview-invalid-error-code",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected control preview success payload mutability diverges", async () => {
+    const handlers = createPrometheusHandlers({
+      runControlPreview: async () =>
+        ({
+          ok: true,
+          payload: {
+            ts: Date.now(),
+            action: "autarch.gap-detection",
+            mutatesState: true,
+            preview: {
+              suggestedGapCount: 1,
+              suggestedGaps: [],
+            },
+          },
+        }) as never,
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "control-preview-invalid-success-mutability",
         method: "prometheus.control.preview",
       },
       params: {
