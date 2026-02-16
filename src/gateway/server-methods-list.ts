@@ -9,6 +9,7 @@ const BASE_METHODS = [
   "prometheus.status",
   "prometheus.goals",
   "prometheus.recursion",
+  "prometheus.monolith",
   "usage.status",
   "usage.cost",
   "tts.status",

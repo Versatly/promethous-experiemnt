@@ -7,6 +7,8 @@ import {
   createFilePrometheusEventStore,
   detectTrajectoryDivergence,
   evaluateAlignmentGuardrails,
+  evaluateInstitutionAction,
+  planCapitalAllocations,
   replayPrometheusEvents,
 } from "../../prometheus/index.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
@@ -49,6 +51,56 @@ function resolveRecursionWindowSize(params: Record<string, unknown>): number {
     return 10;
   }
   return Math.max(1, Math.floor(raw));
+}
+
+const CAPITAL_FORMS = ["money", "compute", "materials", "labor", "political", "data"] as const;
+type CapitalForm = (typeof CAPITAL_FORMS)[number];
+
+function isCapitalForm(value: unknown): value is CapitalForm {
+  return typeof value === "string" && CAPITAL_FORMS.includes(value as CapitalForm);
+}
+
+function resolveCapitalDemands(params: Record<string, unknown>) {
+  const rawDemands = params.demands;
+  if (!Array.isArray(rawDemands)) {
+    return [];
+  }
+  const demands: Array<{
+    goalId: string;
+    form: CapitalForm;
+    requiredAmount: number;
+    priority: number;
+  }> = [];
+  for (const demand of rawDemands) {
+    if (!demand || typeof demand !== "object") {
+      continue;
+    }
+    const candidate = demand as Record<string, unknown>;
+    if (typeof candidate.goalId !== "string" || !candidate.goalId.trim()) {
+      continue;
+    }
+    if (!isCapitalForm(candidate.form)) {
+      continue;
+    }
+    if (
+      typeof candidate.requiredAmount !== "number" ||
+      !Number.isFinite(candidate.requiredAmount)
+    ) {
+      continue;
+    }
+    const priorityRaw = candidate.priority;
+    const priority =
+      typeof priorityRaw === "number" && Number.isFinite(priorityRaw)
+        ? Math.max(0, Math.floor(priorityRaw))
+        : 0;
+    demands.push({
+      goalId: candidate.goalId,
+      form: candidate.form,
+      requiredAmount: Math.max(0, candidate.requiredAmount),
+      priority,
+    });
+  }
+  return demands;
 }
 
 export const prometheusHandlers: GatewayRequestHandlers = {
@@ -200,6 +252,120 @@ export const prometheusHandlers: GatewayRequestHandlers = {
             acceptanceRatio,
           },
           cycles,
+        },
+        undefined,
+      );
+    } catch (error) {
+      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+    }
+  },
+  "prometheus.monolith": async ({ respond, params }) => {
+    try {
+      const stateDir = resolveObserverStateDir(params);
+      const eventStore = createFilePrometheusEventStore(
+        path.join(stateDir, "prometheus", "events.jsonl"),
+      );
+      const events = await eventStore.readAll();
+      const state = replayPrometheusEvents(events);
+      const demands = resolveCapitalDemands(params);
+      const capitalByInstitution = Object.values(state.capitalLedger).reduce(
+        (accumulator, entry) => {
+          const byForm = accumulator[entry.institutionId] ?? {
+            money: 0,
+            compute: 0,
+            materials: 0,
+            labor: 0,
+            political: 0,
+            data: 0,
+          };
+          byForm[entry.form] += entry.amount;
+          accumulator[entry.institutionId] = byForm;
+          return accumulator;
+        },
+        {} as Record<string, Record<CapitalForm, number>>,
+      );
+      const totalsByForm = Object.values(capitalByInstitution).reduce(
+        (totals, capital) => {
+          for (const form of CAPITAL_FORMS) {
+            totals[form] += capital[form] ?? 0;
+          }
+          return totals;
+        },
+        {
+          money: 0,
+          compute: 0,
+          materials: 0,
+          labor: 0,
+          political: 0,
+          data: 0,
+        } as Record<CapitalForm, number>,
+      );
+
+      const institutions = Object.values(state.institutions)
+        .toSorted((left, right) => left.name.localeCompare(right.name))
+        .map((institution) => ({
+          institutionId: institution.id,
+          name: institution.name,
+          status: institution.status,
+          mandate: institution.mandate,
+          authorityModel: institution.authorityModel,
+          capital: capitalByInstitution[institution.id] ?? {
+            money: 0,
+            compute: 0,
+            materials: 0,
+            labor: 0,
+            political: 0,
+            data: 0,
+          },
+        }));
+
+      const allocationPreview =
+        demands.length > 0
+          ? (() => {
+              const plan = planCapitalAllocations({
+                state,
+                demands,
+              });
+              const governanceChecks = plan.allocations.map((allocation) => ({
+                ...allocation,
+                decision: evaluateInstitutionAction({
+                  state,
+                  request: {
+                    institutionId: allocation.institutionId,
+                    type: "capital.allocate",
+                    form: allocation.form,
+                    amount: allocation.amount,
+                  },
+                }),
+              }));
+              return {
+                requestedDemands: demands.length,
+                allocations: plan.allocations,
+                unmetDemands: plan.unmetDemands,
+                governanceChecks,
+              };
+            })()
+          : null;
+
+      respond(
+        true,
+        {
+          ts: Date.now(),
+          summary: {
+            institutions: institutions.length,
+            activeInstitutions: institutions.filter(
+              (institution) => institution.status === "active",
+            ).length,
+            dormantInstitutions: institutions.filter(
+              (institution) => institution.status === "dormant",
+            ).length,
+            dissolvedInstitutions: institutions.filter(
+              (institution) => institution.status === "dissolved",
+            ).length,
+          },
+          totalsByForm,
+          institutions,
+          allocationPreview,
         },
         undefined,
       );

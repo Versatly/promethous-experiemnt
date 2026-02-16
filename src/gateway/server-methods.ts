@@ -82,6 +82,7 @@ const READ_METHODS = new Set([
   "prometheus.status",
   "prometheus.goals",
   "prometheus.recursion",
+  "prometheus.monolith",
 ]);
 const WRITE_METHODS = new Set([
   "send",

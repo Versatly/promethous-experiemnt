@@ -294,4 +294,103 @@ describe("gateway prometheus.status", () => {
     expect(response.payload?.cycles?.[0]?.rollbackOfCycleId).toBe("cycle-rec-1");
     ws.close();
   });
+
+  it("returns monolith institutional capital telemetry and allocation preview", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-monolith-goal",
+        type: "goal.created",
+        occurredAt: 30,
+        payload: {
+          goalId: "goal-mono",
+          title: "Institutional objective",
+          objective: "Allocate capital",
+          priority: 95,
+        },
+      },
+      {
+        id: "evt-monolith-inst",
+        type: "institution.created",
+        occurredAt: 31,
+        payload: {
+          institutionId: "inst-mono",
+          name: "Monolith Institute",
+          mandate: "scale recursive intelligence",
+          authorityModel: "council",
+        },
+      },
+      {
+        id: "evt-monolith-cap",
+        type: "capital.allocated",
+        occurredAt: 32,
+        payload: {
+          capitalId: "capital-mono",
+          institutionId: "inst-mono",
+          form: "compute",
+          amount: 120,
+          unit: "gpu-hours",
+        },
+      },
+    ]);
+
+    const { ws } = await harness.openClient();
+    const monolithP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-monolith",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-monolith",
+        method: "prometheus.monolith",
+        params: {
+          demands: [
+            {
+              goalId: "goal-mono",
+              form: "compute",
+              requiredAmount: 90,
+              priority: 100,
+            },
+          ],
+        },
+      }),
+    );
+    const response = (await monolithP) as {
+      ok?: boolean;
+      payload?: {
+        totalsByForm?: {
+          compute?: number;
+        };
+        institutions?: Array<{
+          institutionId?: string;
+          capital?: { compute?: number };
+        }>;
+        allocationPreview?: {
+          allocations?: Array<{ amount?: number; institutionId?: string }>;
+          governanceChecks?: Array<{
+            decision?: { allowed?: boolean; requiredApprovals?: string[] };
+          }>;
+        } | null;
+      };
+    };
+
+    expect(response.ok).toBe(true);
+    expect(response.payload?.totalsByForm?.compute).toBeGreaterThanOrEqual(120);
+    expect(
+      response.payload?.institutions?.some(
+        (institution) => institution.institutionId === "inst-mono",
+      ),
+    ).toBe(true);
+    expect(response.payload?.allocationPreview?.allocations?.[0]?.institutionId).toBe("inst-mono");
+    expect(response.payload?.allocationPreview?.allocations?.[0]?.amount).toBe(90);
+    expect(response.payload?.allocationPreview?.governanceChecks?.[0]?.decision?.allowed).toBe(
+      true,
+    );
+    ws.close();
+  });
 });
