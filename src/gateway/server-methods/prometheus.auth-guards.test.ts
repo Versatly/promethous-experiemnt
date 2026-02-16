@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ErrorCodes } from "../protocol/index.js";
 import {
   buildPrometheusPlannedMutatingMethodPreflight,
@@ -68,6 +68,20 @@ describe("PROMETHEUS mutating-control guard", () => {
       }),
     });
     expect(error).toBeUndefined();
+  });
+
+  it("does not invoke mutating metadata resolver for unknown methods", () => {
+    const resolveMethodMetadata = vi.fn(() => ({
+      access: "write" as const,
+      mutatesState: true,
+    }));
+    const error = getPrometheusMutatingControlGuardError({
+      method: "prometheus.unknown-method",
+      env: {},
+      resolveMethodMetadata,
+    });
+    expect(error).toBeUndefined();
+    expect(resolveMethodMetadata).not.toHaveBeenCalled();
   });
 
   it("propagates mutating metadata resolver exceptions to caller", () => {
@@ -272,6 +286,31 @@ describe("PROMETHEUS mutating-control guard", () => {
         }) as never,
     });
     expect(error).toBeUndefined();
+  });
+
+  it("does not invoke planned resolvers for non-planned methods", () => {
+    const resolvePlannedMethodMetadata = vi.fn(() => ({
+      access: "write" as const,
+      mutatesState: true as const,
+      enabled: false as const,
+      enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+      requiredParams: ["action"] as const,
+      reason: "should not be called",
+    }));
+    const resolvePlannedMethodPreflight = vi.fn(() => ({
+      disabledMessage: "should not be called",
+      notImplementedMessage: "should not be called",
+      requiredParamsMessage: "should not be called",
+    }));
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.status",
+      env: {},
+      resolvePlannedMethodMetadata,
+      resolvePlannedMethodPreflight,
+    });
+    expect(error).toBeUndefined();
+    expect(resolvePlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePlannedMethodPreflight).not.toHaveBeenCalled();
   });
 
   it("propagates planned metadata resolver exceptions to caller", () => {
