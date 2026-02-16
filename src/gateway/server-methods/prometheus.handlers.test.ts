@@ -8,7 +8,10 @@ import {
   createFilePrometheusEventStore,
 } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
-import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./prometheus-methods.js";
+import {
+  PROMETHEUS_GATEWAY_METHOD_METADATA,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
+} from "./prometheus-methods.js";
 import { assertPrometheusHandlerContract, prometheusHandlers } from "./prometheus.js";
 
 const cleanupDirs = new Set<string>();
@@ -24,6 +27,7 @@ afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true });
   }
   cleanupDirs.clear();
+  vi.unstubAllEnvs();
 });
 
 describe("prometheusHandlers contract", () => {
@@ -680,6 +684,30 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
               requiredParams: ["proposal", "baseline", "candidate"],
             }),
           ]),
+        }),
+      }),
+      undefined,
+    );
+  });
+
+  it("reflects env-enabled mutating control guardrail state", async () => {
+    vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.catalog"]({
+      req: { type: "req", id: "control-catalog-2", method: "prometheus.control.catalog" },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        guardrails: expect.objectContaining({
+          mutationsEnabled: true,
+          enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
         }),
       }),
       undefined,
