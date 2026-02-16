@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { ErrorCodes } from "../protocol/index.js";
 import {
-  getPrometheusMutatingControlGuardError,
-  getPrometheusPlannedMutatingMethodGuardError,
-} from "../server-methods.js";
-import {
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./prometheus-methods.js";
+import {
+  getPrometheusMutatingControlGuardError,
+  getPrometheusPlannedMutatingMethodGuardError,
+} from "./prometheus.auth-guards.js";
 
 describe("PROMETHEUS mutating-control guard", () => {
   it("does not block non-mutating methods", () => {
