@@ -87,6 +87,44 @@ describe("prometheus control preview runtime flows (planned actions)", () => {
     });
   });
 
+  it("invokes planned-action resolvers only for the requested planned action", async () => {
+    const action = "autarch.gap-detection.commit";
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const resolvePlannedActionMetadata = vi.fn((requestedAction: string) =>
+      getPrometheusPlannedMutatingPreviewActionMetadata(requestedAction),
+    );
+    const resolvePlannedActionPreflight = vi.fn((requestedAction: string) =>
+      getPrometheusPlannedMutatingPreviewActionPreflight(requestedAction),
+    );
+
+    const result = await runPrometheusControlPreview(
+      {
+        action,
+        goalId: "goal-1",
+      },
+      {
+        resolvePlannedActionMetadata,
+        resolvePlannedActionPreflight,
+      },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining(`"${action}" is disabled`),
+      },
+    });
+    expect(resolvePlannedActionMetadata).toHaveBeenCalledTimes(1);
+    expect(resolvePlannedActionPreflight).toHaveBeenCalledTimes(1);
+    expect(resolvePlannedActionMetadata).toHaveBeenCalledWith(action);
+    expect(resolvePlannedActionPreflight).toHaveBeenCalledWith(action);
+  });
+
   it("falls back to metadata when planned-action preflight resolver returns malformed object", async () => {
     const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(
       "autarch.gap-detection.commit",
