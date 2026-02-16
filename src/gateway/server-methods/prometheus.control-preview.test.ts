@@ -11,6 +11,8 @@ import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 import {
   assertPrometheusControlPreviewActionContract,
   assertPrometheusPlannedMutatingPreviewActionContract,
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
   isPrometheusPlannedMutatingPreviewAction,
   listPrometheusPlannedMutatingPreviewActions,
   listPrometheusMutatingPreviewActions,
@@ -21,6 +23,7 @@ import {
   runPrometheusControlPreview,
 } from "./prometheus.control-preview.js";
 import {
+  formatPrometheusRequiredParamsMessage,
   formatPrometheusMissingRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
@@ -310,6 +313,35 @@ describe("prometheus control preview helpers", () => {
           PROMETHEUS_MUTATING_CONTROLS_ENV,
         ),
       },
+    });
+  });
+
+  it("builds planned mutating action preflight messages from metadata", () => {
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    expect(
+      buildPrometheusPlannedMutatingPreviewActionPreflight({
+        action: "autarch.gap-detection.commit",
+        metadata,
+      }),
+    ).toEqual({
+      disabledMessage: formatPlannedMutatingActionDisabledMessage(
+        "autarch.gap-detection.commit",
+        PROMETHEUS_MUTATING_CONTROLS_ENV,
+      ),
+      notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
+        "autarch.gap-detection.commit",
+      ),
+      requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+        kind: "action",
+        name: "autarch.gap-detection.commit",
+        requiredParams: ["goalId"],
+      }),
     });
   });
 

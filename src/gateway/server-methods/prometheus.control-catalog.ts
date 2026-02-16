@@ -1,25 +1,20 @@
 import {
   arePrometheusMutatingControlsEnabled,
+  buildPrometheusPlannedMutatingMethodPreflight,
+  getPrometheusPlannedMutatingMethodMetadata,
   listPrometheusMutatingMethods,
   listPrometheusPlannedMutatingMethods,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
-  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
 } from "./prometheus-methods.js";
 import {
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
   listPrometheusMutatingPreviewActions,
   listPrometheusPlannedMutatingPreviewActions,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
-  PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
-import {
-  formatPrometheusRequiredParamsMessage,
-  formatPlannedMutatingActionDisabledMessage,
-  formatPlannedMutatingActionNotImplementedMessage,
-  formatPlannedMutatingMethodDisabledMessage,
-  formatPlannedMutatingMethodNotImplementedMessage,
-} from "./prometheus.preflight-guards.js";
 
 export type PrometheusControlCatalogSnapshot = {
   ts: number;
@@ -124,41 +119,31 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
       mutatingMethods,
       mutatingPreviewActions,
       plannedMutatingMethods: plannedMutatingMethods.map((method) => {
-        const metadata = PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method];
+        const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+        if (!metadata) {
+          throw new Error(`Missing planned mutating method metadata for "${method}"`);
+        }
         return {
           method,
           ...metadata,
-          preflight: {
-            disabledMessage: formatPlannedMutatingMethodDisabledMessage(
-              method,
-              metadata.enableEnvVar,
-            ),
-            notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(method),
-            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
-              kind: "method",
-              name: method,
-              requiredParams: metadata.requiredParams,
-            }),
-          },
+          preflight: buildPrometheusPlannedMutatingMethodPreflight({
+            method,
+            metadata,
+          }),
         };
       }),
       plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => {
-        const metadata = PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA[action];
+        const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+        if (!metadata) {
+          throw new Error(`Missing planned mutating action metadata for "${action}"`);
+        }
         return {
           action,
           ...metadata,
-          preflight: {
-            disabledMessage: formatPlannedMutatingActionDisabledMessage(
-              action,
-              metadata.enableEnvVar,
-            ),
-            notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(action),
-            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
-              kind: "action",
-              name: action,
-              requiredParams: metadata.requiredParams,
-            }),
-          },
+          preflight: buildPrometheusPlannedMutatingPreviewActionPreflight({
+            action,
+            metadata,
+          }),
         };
       }),
     },

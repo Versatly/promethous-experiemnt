@@ -3,6 +3,7 @@ import {
   arePrometheusMutatingControlsEnabled,
   assertPrometheusGatewayMethodMetadataContract,
   assertPrometheusPlannedMutatingMethodContract,
+  buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusGatewayMethodMetadata,
   getPrometheusPlannedMutatingMethodMetadata,
   listPrometheusPlannedMutatingMethods,
@@ -15,6 +16,11 @@ import {
   PROMETHEUS_GATEWAY_WRITE_METHODS,
   type PrometheusGatewayMethod,
 } from "./prometheus-methods.js";
+import {
+  formatPrometheusRequiredParamsMessage,
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 describe("PROMETHEUS method access map", () => {
   it("contains unique method names", () => {
@@ -168,6 +174,33 @@ describe("PROMETHEUS method access map", () => {
       }),
     );
     expect(getPrometheusPlannedMutatingMethodMetadata("prometheus.status")).toBeUndefined();
+  });
+
+  it("builds planned mutating method preflight messages from metadata", () => {
+    const metadata = getPrometheusPlannedMutatingMethodMetadata("prometheus.control.execute");
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    expect(
+      buildPrometheusPlannedMutatingMethodPreflight({
+        method: "prometheus.control.execute",
+        metadata,
+      }),
+    ).toEqual({
+      disabledMessage: formatPlannedMutatingMethodDisabledMessage(
+        "prometheus.control.execute",
+        PROMETHEUS_MUTATING_CONTROLS_ENV,
+      ),
+      notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
+        "prometheus.control.execute",
+      ),
+      requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+        kind: "method",
+        name: "prometheus.control.execute",
+        requiredParams: ["action"],
+      }),
+    });
   });
 
   it("exports stable planned mutating method set for rollout scaffolding", () => {

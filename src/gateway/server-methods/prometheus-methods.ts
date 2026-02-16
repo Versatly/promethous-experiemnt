@@ -1,3 +1,9 @@
+import {
+  formatPrometheusRequiredParamsMessage,
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
+
 export const PROMETHEUS_GATEWAY_READ_METHODS = [
   "prometheus.status",
   "prometheus.control.catalog",
@@ -37,6 +43,12 @@ export type PrometheusPlannedMutatingMethodMetadata = {
   enableEnvVar: typeof PROMETHEUS_MUTATING_CONTROLS_ENV;
   requiredParams: readonly string[];
   reason: string;
+};
+
+export type PrometheusPlannedMutatingMethodPreflight = {
+  disabledMessage: string;
+  notImplementedMessage: string;
+  requiredParamsMessage: string;
 };
 
 export const PROMETHEUS_GATEWAY_METHOD_METADATA: Record<
@@ -135,6 +147,22 @@ export function getPrometheusPlannedMutatingMethodMetadata(
     return undefined;
   }
   return PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method];
+}
+
+export function buildPrometheusPlannedMutatingMethodPreflight(args: {
+  method: string;
+  metadata: PrometheusPlannedMutatingMethodMetadata;
+}): PrometheusPlannedMutatingMethodPreflight {
+  const { method, metadata } = args;
+  return {
+    disabledMessage: formatPlannedMutatingMethodDisabledMessage(method, metadata.enableEnvVar),
+    notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(method),
+    requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+      kind: "method",
+      name: method,
+      requiredParams: metadata.requiredParams,
+    }),
+  };
 }
 
 export function arePrometheusMutatingControlsEnabled(

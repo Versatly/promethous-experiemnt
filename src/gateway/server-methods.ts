@@ -16,6 +16,7 @@ import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
 import {
   arePrometheusMutatingControlsEnabled,
+  buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusGatewayMethodMetadata,
   getPrometheusPlannedMutatingMethodMetadata,
   type PrometheusPlannedMutatingMethodMetadata,
@@ -24,10 +25,6 @@ import {
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./server-methods/prometheus-methods.js";
 import { prometheusHandlers } from "./server-methods/prometheus.js";
-import {
-  formatPlannedMutatingMethodDisabledMessage,
-  formatPlannedMutatingMethodNotImplementedMessage,
-} from "./server-methods/prometheus.preflight-guards.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -125,20 +122,6 @@ function mutatingControlsDisabledError() {
   );
 }
 
-function plannedMutatingMethodDisabledError(method: string) {
-  return errorShape(
-    ErrorCodes.UNAVAILABLE,
-    formatPlannedMutatingMethodDisabledMessage(method, PROMETHEUS_MUTATING_CONTROLS_ENV),
-  );
-}
-
-function plannedMutatingMethodUnimplementedError(method: string) {
-  return errorShape(
-    ErrorCodes.UNAVAILABLE,
-    formatPlannedMutatingMethodNotImplementedMessage(method),
-  );
-}
-
 export function getPrometheusMutatingControlGuardError(args: {
   method: string;
   env?: NodeJS.ProcessEnv;
@@ -172,9 +155,13 @@ export function getPrometheusPlannedMutatingMethodGuardError(args: {
   if (!plannedMetadata) {
     return undefined;
   }
+  const preflight = buildPrometheusPlannedMutatingMethodPreflight({
+    method,
+    metadata: plannedMetadata,
+  });
   return arePrometheusMutatingControlsEnabled(env)
-    ? plannedMutatingMethodUnimplementedError(method)
-    : plannedMutatingMethodDisabledError(method);
+    ? errorShape(ErrorCodes.UNAVAILABLE, preflight.notImplementedMessage)
+    : errorShape(ErrorCodes.UNAVAILABLE, preflight.disabledMessage);
 }
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {

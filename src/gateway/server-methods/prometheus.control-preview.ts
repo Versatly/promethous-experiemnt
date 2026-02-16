@@ -20,6 +20,7 @@ import {
   resolveTrajectoryWindowSize,
 } from "./prometheus.params.js";
 import {
+  formatPrometheusRequiredParamsMessage,
   formatPrometheusMissingRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
@@ -60,6 +61,12 @@ type PrometheusPlannedMutatingPreviewActionMetadata = {
   enableEnvVar: typeof PROMETHEUS_MUTATING_CONTROLS_ENV;
   requiredParams: readonly string[];
   reason: string;
+};
+
+export type PrometheusPlannedMutatingPreviewActionPreflight = {
+  disabledMessage: string;
+  notImplementedMessage: string;
+  requiredParamsMessage: string;
 };
 
 export const PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA = {
@@ -111,6 +118,31 @@ export function listPrometheusPlannedMutatingPreviewActions(
     .filter(([, metadata]) => !metadata.enabled && metadata.mutatesState)
     .map(([action]) => action)
     .toSorted();
+}
+
+export function getPrometheusPlannedMutatingPreviewActionMetadata(
+  action: string,
+): PrometheusPlannedMutatingPreviewActionMetadata | undefined {
+  if (!(action in PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)) {
+    return undefined;
+  }
+  return PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA[action];
+}
+
+export function buildPrometheusPlannedMutatingPreviewActionPreflight(args: {
+  action: string;
+  metadata: PrometheusPlannedMutatingPreviewActionMetadata;
+}): PrometheusPlannedMutatingPreviewActionPreflight {
+  const { action, metadata } = args;
+  return {
+    disabledMessage: formatPlannedMutatingActionDisabledMessage(action, metadata.enableEnvVar),
+    notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(action),
+    requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+      kind: "action",
+      name: action,
+      requiredParams: metadata.requiredParams,
+    }),
+  };
 }
 
 export function isPrometheusPlannedMutatingPreviewAction(
@@ -316,13 +348,19 @@ export async function runPrometheusControlPreview(
       return invalidRequest("action is required for prometheus.control.preview");
     }
     if (isPrometheusPlannedMutatingPreviewAction(rawAction)) {
+      const actionMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(rawAction);
+      if (!actionMetadata) {
+        return unavailableRequest(formatPlannedMutatingActionNotImplementedMessage(rawAction));
+      }
+      const preflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+        action: rawAction,
+        metadata: actionMetadata,
+      });
       const controlsEnabled = arePrometheusMutatingControlsEnabled();
       if (!controlsEnabled) {
-        return unavailableRequest(
-          formatPlannedMutatingActionDisabledMessage(rawAction, PROMETHEUS_MUTATING_CONTROLS_ENV),
-        );
+        return unavailableRequest(preflight.disabledMessage);
       }
-      return unavailableRequest(formatPlannedMutatingActionNotImplementedMessage(rawAction));
+      return unavailableRequest(preflight.notImplementedMessage);
     }
     if (!isPrometheusControlPreviewAction(rawAction)) {
       return invalidRequest(`Unsupported control preview action "${rawAction}"`);
