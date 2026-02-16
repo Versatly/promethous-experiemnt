@@ -97,6 +97,27 @@ describe("prometheus request test helpers", () => {
     );
   });
 
+  it("handles non-string custom role values at runtime with canonical denial", async () => {
+    const respond = vi.fn();
+    await runPrometheusRoleRequest({
+      role: 7 as never,
+      request: {
+        id: "request-helper-custom-role-non-string-runtime",
+        method: "prometheus.status",
+        params: {},
+      },
+      respond,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: 7"),
+      }),
+    );
+  });
+
   it("forwards default node role/scopes into extra handlers", async () => {
     const nodeEventHandler = vi.fn(async ({ client, respond }) => {
       expect(client).toEqual({

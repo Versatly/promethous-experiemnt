@@ -151,6 +151,52 @@ describe("PROMETHEUS gateway authorization override invocation scope", () => {
     expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
   });
 
+  it("does not dispatch extra handlers when runtime role value is malformed", async () => {
+    const method = "prometheus.control.execute";
+    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not be called for malformed role");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not be called for malformed role");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not be called for malformed role");
+    });
+    const respond = vi.fn();
+    await runPrometheusRoleRequest({
+      role: 7 as never,
+      request: {
+        id: "malformed-role-planned-method-extra-handler-short-circuit",
+        method,
+        params: {},
+      },
+      respond,
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+      extraHandlers: {
+        [method]: plannedExecuteHandler,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: 7"),
+      }),
+    );
+    expect(plannedExecuteHandler).not.toHaveBeenCalled();
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
   it("does not invoke PROMETHEUS auth override resolvers for non-prometheus methods", async () => {
     const resolvePrometheusMethodMetadata = vi.fn(() => {
       throw new Error("method metadata resolver should not be called");
