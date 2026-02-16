@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
   runPrometheusControlPreview,
 } from "./prometheus.control-preview.js";
 import { createPrometheusHandlers } from "./prometheus.js";
+import { runPrometheusWriteRequest } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -25,9 +24,8 @@ describe("PROMETHEUS gateway authorization planned preview-action fallback regre
       metadata,
     });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-action-fallback-request-level",
         method: "prometheus.control.preview",
         params: {
@@ -35,15 +33,7 @@ describe("PROMETHEUS gateway authorization planned preview-action fallback regre
           goalId: "goal-1",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: (params, deps) =>
           runPrometheusControlPreview(params, {
@@ -76,9 +66,8 @@ describe("PROMETHEUS gateway authorization planned preview-action fallback regre
       metadata,
     });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-action-divergent-preflight-request-level",
         method: "prometheus.control.preview",
         params: {
@@ -86,15 +75,7 @@ describe("PROMETHEUS gateway authorization planned preview-action fallback regre
           goalId: "goal-1",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: (params, deps) =>
           runPrometheusControlPreview(params, {

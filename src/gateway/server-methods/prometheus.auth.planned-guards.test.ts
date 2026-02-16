@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import {
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
 } from "./prometheus-methods.js";
+import { runPrometheusWriteRequest } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -22,22 +21,13 @@ describe("PROMETHEUS gateway authorization planned mutating guardrails", () => {
       }
       const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
       const respond = vi.fn();
-      await handleGatewayRequest({
-        req: {
-          type: "req",
+      await runPrometheusWriteRequest({
+        request: {
           id: `planned-${method}`,
           method,
           params: {},
         },
-        client: {
-          connect: {
-            role: "operator",
-            scopes: ["operator.write"],
-          },
-        },
-        isWebchatConnect: () => false,
         respond,
-        context: {} as GatewayRequestContext,
       });
 
       expect(respond).toHaveBeenCalledWith(
@@ -61,22 +51,13 @@ describe("PROMETHEUS gateway authorization planned mutating guardrails", () => {
       }
       const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
       const respond = vi.fn();
-      await handleGatewayRequest({
-        req: {
-          type: "req",
+      await runPrometheusWriteRequest({
+        request: {
           id: `planned-enabled-${method}`,
           method,
           params: {},
         },
-        client: {
-          connect: {
-            role: "operator",
-            scopes: ["operator.write"],
-          },
-        },
-        isWebchatConnect: () => false,
         respond,
-        context: {} as GatewayRequestContext,
       });
 
       expect(respond).toHaveBeenCalledWith(
@@ -101,22 +82,13 @@ describe("PROMETHEUS gateway authorization planned mutating guardrails", () => {
     const resolvePrometheusPlannedMethodMetadata = vi.fn(() => metadata);
     const resolvePrometheusPlannedMethodPreflight = vi.fn(() => preflight);
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-method-resolver-invocation-scope",
         method,
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusPlannedMethodMetadata,
         resolvePrometheusPlannedMethodPreflight,

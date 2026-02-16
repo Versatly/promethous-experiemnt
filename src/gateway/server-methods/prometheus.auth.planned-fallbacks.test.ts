@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import {
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./prometheus-methods.js";
+import { runPrometheusWriteRequest } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -21,22 +20,13 @@ describe("PROMETHEUS gateway authorization planned mutating method fallback regr
     }
     const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-fallback-request-level",
         method,
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusPlannedMethodPreflight: () => undefined,
         resolvePrometheusPlannedMethodMetadata: () => metadata,
@@ -62,22 +52,13 @@ describe("PROMETHEUS gateway authorization planned mutating method fallback regr
     }
     const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-malformed-preflight-request-level",
         method,
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusPlannedMethodPreflight: () =>
           ({
@@ -105,22 +86,13 @@ describe("PROMETHEUS gateway authorization planned mutating method fallback regr
     }
     const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-divergent-preflight-request-level",
         method,
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusPlannedMethodPreflight: () => ({
           disabledMessage: "DIVERGENT disabled message",
@@ -149,22 +121,13 @@ describe("PROMETHEUS gateway authorization planned mutating method fallback regr
     }
     const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-malformed-metadata-request-level",
         method,
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusPlannedMethodMetadata: () =>
           ({
@@ -197,22 +160,13 @@ describe("PROMETHEUS gateway authorization planned mutating method fallback regr
     }
     const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-blank-reason-metadata-request-level",
         method,
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       authOverrides: {
         resolvePrometheusPlannedMethodMetadata: () =>
           ({
