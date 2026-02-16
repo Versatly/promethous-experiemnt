@@ -6,6 +6,10 @@ import { describe, expect, it } from "vitest";
 const SERVER_METHODS_DIR = fileURLToPath(new URL(".", import.meta.url));
 const HARNESS_GUARDRAIL_TEST_BASENAME = "prometheus.test-harness-guardrails.test.ts";
 const OBSERVER_STORE_WIRING_EXEMPT_FILES = new Set(["prometheus.test-temp-dir.test.ts"]);
+const GOAL_FIXTURE_EXEMPT_FILES = new Set([
+  "prometheus.test-events.test.ts",
+  "prometheus.test-temp-dir.test.ts",
+]);
 
 async function listPrometheusTestFiles(targetDir: string): Promise<string[]> {
   const entries = await fs.readdir(targetDir, { withFileTypes: true });
@@ -82,6 +86,18 @@ describe("prometheus test harness guardrails", () => {
         'path.join(stateDir, "prometheus", "events.jsonl")',
         'path.join(stateDir, "prometheus", "helios-trajectory.jsonl")',
       ],
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("uses shared goal fixtures instead of inline goal.created payload blocks", async () => {
+    const files = (await listPrometheusTestFiles(SERVER_METHODS_DIR)).filter(
+      (filePath) => !GOAL_FIXTURE_EXEMPT_FILES.has(path.basename(filePath)),
+    );
+    const violations = await listFilesContainingNeedles({
+      files,
+      needles: ['type: "goal.created"'],
     });
 
     expect(violations).toEqual([]);
