@@ -59,11 +59,13 @@ describe("prometheus test harness guardrails", () => {
     expect(violations).toEqual([]);
   });
 
-  it("avoids direct control handler invocation in prometheus test files", async () => {
+  it("avoids direct prometheus handler invocation in prometheus test files", async () => {
     const files = await listPrometheusTestFiles(SERVER_METHODS_DIR);
     const violations = await listFilesContainingNeedles({
       files,
       needles: [
+        'prometheusHandlers["prometheus.',
+        'handlers["prometheus.',
         'prometheusHandlers["prometheus.control.catalog"](',
         'handlers["prometheus.control.catalog"](',
         'prometheusHandlers["prometheus.control.preview"](',
