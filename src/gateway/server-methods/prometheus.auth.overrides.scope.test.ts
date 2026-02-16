@@ -13,6 +13,7 @@ import {
 import { createPrometheusHandlers } from "./prometheus.js";
 import {
   runPrometheusNodeRequest,
+  runPrometheusOperatorRequest,
   runPrometheusReadRequest,
 } from "./prometheus.request-test-helpers.js";
 
@@ -86,6 +87,45 @@ describe("PROMETHEUS gateway authorization override invocation scope", () => {
     expect(respond).toHaveBeenCalled();
     const [ok] = respond.mock.calls[0] as [boolean, unknown, unknown];
     expect(ok).toBe(true);
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
+  it("does not invoke PROMETHEUS auth overrides for unknown prometheus-prefixed methods", async () => {
+    const method = "prometheus.unknown.gateway.method";
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not be called for unknown methods");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not be called for unknown methods");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not be called for unknown methods");
+    });
+    const respond = vi.fn();
+    await runPrometheusOperatorRequest({
+      request: {
+        id: "unknown-prometheus-method-auth-override-short-circuit",
+        method,
+        params: {},
+      },
+      respond,
+      scopes: ["operator.admin"],
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: `unknown method: ${method}`,
+      }),
+    );
     expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
     expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
     expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
