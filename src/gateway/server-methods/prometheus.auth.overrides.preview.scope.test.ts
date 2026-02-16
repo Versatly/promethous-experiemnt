@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
   runPrometheusControlPreview,
 } from "./prometheus.control-preview.js";
 import { createPrometheusHandlers } from "./prometheus.js";
+import {
+  runPrometheusOperatorRequest,
+  runPrometheusWriteRequest,
+} from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -21,22 +23,14 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
       throw new Error("catalog dependency should not be called");
     });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusOperatorRequest({
+      request: {
         id: "non-prometheus-extra-handler-short-circuit",
         method: "status",
         params: {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
+      scopes: ["operator.read"],
       extraHandlers: createPrometheusHandlers({
         runControlPreview,
         buildControlCatalogSnapshot,
@@ -76,9 +70,8 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
     });
 
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "planned-action-resolver-invocation-scope-request-level",
         method: "prometheus.control.preview",
         params: {
@@ -86,15 +79,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
           goalId: "goal-1",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: (params, deps) =>
           runPrometheusControlPreview(params, {
@@ -127,24 +112,15 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
       throw new Error("planned-action preflight resolver should not be called");
     });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "active-action-resolver-short-circuit-request-level",
         method: "prometheus.control.preview",
         params: {
           action: "autarch.gap-detection",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: (params, deps) =>
           runPrometheusControlPreview(params, {

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import { createPrometheusHandlers } from "./prometheus.js";
+import { runPrometheusWriteRequest } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -14,9 +13,8 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
       throw new Error("request-level controlPreviewDeps metadata dependency exploded");
     });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "request-level-control-preview-deps-forwarding-planned-action",
         method: "prometheus.control.preview",
         params: {
@@ -24,15 +22,7 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
           goalId: "goal-1",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         controlPreviewDeps: {
           resolvePlannedActionMetadata,
@@ -59,24 +49,15 @@ describe("PROMETHEUS gateway authorization override invocation scope (control pr
       throw new Error("controlPreviewDeps metadata resolver should not be called");
     });
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "request-level-control-preview-deps-short-circuit-active-action",
         method: "prometheus.control.preview",
         params: {
           action: "autarch.gap-detection",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         controlPreviewDeps: {
           resolvePlannedActionMetadata,

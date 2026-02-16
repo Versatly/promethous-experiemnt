@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import { createPrometheusHandlers } from "./prometheus.js";
+import { runPrometheusWriteRequest } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -10,24 +9,15 @@ afterEach(() => {
 describe("PROMETHEUS gateway authorization override regressions (control preview)", () => {
   it("returns UNAVAILABLE when injected preview dependency violates bounded AUTARCH invariants at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "preview-autarch-bounds-request-level",
         method: "prometheus.control.preview",
         params: {
           action: "autarch.gap-detection",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: async () =>
           ({
@@ -64,9 +54,8 @@ describe("PROMETHEUS gateway authorization override regressions (control preview
 
   it("returns UNAVAILABLE when injected preview dependency violates bounded HELIOS invariants at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "preview-helios-bounds-request-level",
         method: "prometheus.control.preview",
         params: {
@@ -74,15 +63,7 @@ describe("PROMETHEUS gateway authorization override regressions (control preview
           goalId: "goal-1",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: async () =>
           ({
@@ -120,9 +101,8 @@ describe("PROMETHEUS gateway authorization override regressions (control preview
 
   it("returns UNAVAILABLE when injected preview dependency violates HELIOS divergence-severity contract at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "preview-helios-divergence-severity-request-level",
         method: "prometheus.control.preview",
         params: {
@@ -130,15 +110,7 @@ describe("PROMETHEUS gateway authorization override regressions (control preview
           goalId: "goal-1",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: async () =>
           ({
@@ -181,24 +153,15 @@ describe("PROMETHEUS gateway authorization override regressions (control preview
 
   it("returns UNAVAILABLE when injected preview dependency violates bounded recursion invariants at request level", async () => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: "preview-recursion-bounds-request-level",
         method: "prometheus.control.preview",
         params: {
           action: "recursion.mutation-evaluation",
         },
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
       extraHandlers: createPrometheusHandlers({
         runControlPreview: async () =>
           ({
