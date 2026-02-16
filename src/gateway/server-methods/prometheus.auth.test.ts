@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { listGatewayMethods } from "../server-methods-list.js";
-import { handleGatewayRequest } from "../server-methods.js";
 import {
   PROMETHEUS_GATEWAY_METHODS,
   PROMETHEUS_GATEWAY_READ_METHODS,
   PROMETHEUS_GATEWAY_WRITE_METHODS,
 } from "./prometheus-methods.js";
+import {
+  runPrometheusNodeRequest,
+  runPrometheusOperatorRequest,
+  runPrometheusReadRequest,
+  runPrometheusWriteRequest,
+} from "./prometheus.request-test-helpers.js";
 
 const READ_METHODS = PROMETHEUS_GATEWAY_READ_METHODS;
 const WRITE_METHODS = PROMETHEUS_GATEWAY_WRITE_METHODS;
@@ -27,22 +31,13 @@ describe("PROMETHEUS gateway authorization", () => {
 
   it.each(READ_METHODS)("allows operator.read scope for %s", async (method) => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusReadRequest({
+      request: {
         id: `read-${method}`,
         method,
         params: method === "prometheus.trajectory" ? { goalId: "goal-root" } : {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalled();
@@ -62,22 +57,14 @@ describe("PROMETHEUS gateway authorization", () => {
 
   it.each(READ_METHODS)("rejects missing read scope for %s", async (method) => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusOperatorRequest({
+      request: {
         id: `deny-${method}`,
         method,
         params: method === "prometheus.trajectory" ? { goalId: "goal-root" } : {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: [],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
+      scopes: [],
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -91,22 +78,13 @@ describe("PROMETHEUS gateway authorization", () => {
 
   it.each(READ_METHODS)("allows operator.write scope for %s", async (method) => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusWriteRequest({
+      request: {
         id: `write-${method}`,
         method,
         params: method === "prometheus.trajectory" ? { goalId: "goal-root" } : {},
       },
-      client: {
-        connect: {
-          role: "operator",
-          scopes: ["operator.write"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalled();
@@ -126,22 +104,13 @@ describe("PROMETHEUS gateway authorization", () => {
   it("requires operator.write scope for all prometheus write methods", async () => {
     for (const method of WRITE_METHODS as ReadonlyArray<string>) {
       const respond = vi.fn();
-      await handleGatewayRequest({
-        req: {
-          type: "req",
+      await runPrometheusReadRequest({
+        request: {
           id: `write-required-${method}`,
           method,
           params: {},
         },
-        client: {
-          connect: {
-            role: "operator",
-            scopes: ["operator.read"],
-          },
-        },
-        isWebchatConnect: () => false,
         respond,
-        context: {} as GatewayRequestContext,
       });
 
       expect(respond).toHaveBeenCalledWith(
@@ -156,22 +125,13 @@ describe("PROMETHEUS gateway authorization", () => {
 
   it.each(READ_METHODS)("rejects node role access for %s", async (method) => {
     const respond = vi.fn();
-    await handleGatewayRequest({
-      req: {
-        type: "req",
+    await runPrometheusNodeRequest({
+      request: {
         id: `node-${method}`,
         method,
         params: method === "prometheus.trajectory" ? { goalId: "goal-root" } : {},
       },
-      client: {
-        connect: {
-          role: "node",
-          scopes: ["operator.read"],
-        },
-      },
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

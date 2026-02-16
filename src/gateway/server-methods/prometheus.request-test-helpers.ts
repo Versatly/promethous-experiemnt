@@ -12,7 +12,11 @@ type PrometheusOperatorRequestArgs = {
   extraHandlers?: GatewayRequestInvocation["extraHandlers"];
 };
 
-export async function runPrometheusOperatorRequest(args: PrometheusOperatorRequestArgs) {
+type PrometheusScopedRequestArgs = PrometheusOperatorRequestArgs & {
+  role?: "operator" | "node";
+};
+
+async function runPrometheusScopedRequest(args: PrometheusScopedRequestArgs) {
   await handleGatewayRequest({
     req: {
       type: "req",
@@ -20,7 +24,7 @@ export async function runPrometheusOperatorRequest(args: PrometheusOperatorReque
     },
     client: {
       connect: {
-        role: "operator",
+        role: args.role ?? "operator",
         scopes: args.scopes ?? ["operator.write"],
       },
     },
@@ -30,6 +34,10 @@ export async function runPrometheusOperatorRequest(args: PrometheusOperatorReque
     authOverrides: args.authOverrides,
     extraHandlers: args.extraHandlers,
   });
+}
+
+export async function runPrometheusOperatorRequest(args: PrometheusOperatorRequestArgs) {
+  await runPrometheusScopedRequest(args);
 }
 
 export async function runPrometheusWriteRequest(
@@ -44,5 +52,15 @@ export async function runPrometheusReadRequest(
   await runPrometheusOperatorRequest({
     ...args,
     scopes: ["operator.read"],
+  });
+}
+
+export async function runPrometheusNodeRequest(
+  args: Omit<PrometheusOperatorRequestArgs, "scopes"> & { scopes?: string[] },
+) {
+  await runPrometheusScopedRequest({
+    ...args,
+    role: "node",
+    scopes: args.scopes ?? ["operator.read"],
   });
 }
