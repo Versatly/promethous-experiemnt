@@ -1370,6 +1370,48 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
     );
   });
 
+  it("returns UNAVAILABLE when injected control preview success payload preview shape diverges", async () => {
+    const handlers = createPrometheusHandlers({
+      runControlPreview: async () =>
+        ({
+          ok: true,
+          payload: {
+            ts: Date.now(),
+            action: "autarch.gap-detection",
+            mutatesState: false,
+            preview: {
+              suggestedGapCount: "1",
+              suggestions: [],
+            },
+          },
+        }) as never,
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "control-preview-invalid-success-preview-shape",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
+
   it("does not mutate event log across preview actions", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
     const eventStore = createFilePrometheusEventStore(

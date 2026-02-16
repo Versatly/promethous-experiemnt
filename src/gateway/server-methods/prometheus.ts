@@ -69,6 +69,10 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 function isPrometheusPlannedPreflightShape(value: unknown): value is {
   disabledMessage: string;
   notImplementedMessage: string;
@@ -359,10 +363,17 @@ function isPrometheusControlPreviewResult(value: unknown): value is PrometheusCo
       return false;
     }
     const expectedMetadata = PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[payload.action];
+    const isValidPreview =
+      payload.action === "autarch.gap-detection"
+        ? isPrometheusAutarchGapDetectionPreview(payload.preview)
+        : payload.action === "helios.trajectory-evaluation"
+          ? isPrometheusHeliosTrajectoryPreview(payload.preview)
+          : isPrometheusRecursionMutationEvaluationPreview(payload.preview);
     return (
       isFiniteNumber(payload.ts) &&
       payload.mutatesState === expectedMetadata.mutatesState &&
-      "preview" in payload
+      "preview" in payload &&
+      isValidPreview
     );
   }
   if (candidate.ok === false) {
@@ -375,6 +386,66 @@ function isPrometheusControlPreviewResult(value: unknown): value is PrometheusCo
     );
   }
   return false;
+}
+
+function isPrometheusAutarchGapDetectionPreview(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const suggestions = value.suggestions;
+  return (
+    isFiniteNumber(value.suggestedGapCount) &&
+    Array.isArray(suggestions) &&
+    suggestions.every((entry) => {
+      if (!isRecord(entry)) {
+        return false;
+      }
+      return (
+        typeof entry.suggestionId === "string" &&
+        typeof entry.goalId === "string" &&
+        typeof entry.severity === "string" &&
+        typeof entry.description === "string"
+      );
+    })
+  );
+}
+
+function isPrometheusHeliosTrajectoryPreview(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.computedSnapshot)) {
+    return false;
+  }
+  const divergence = value.divergence;
+  const isValidDivergence =
+    divergence === null ||
+    (isRecord(divergence) &&
+      typeof divergence.severity === "string" &&
+      typeof divergence.reason === "string" &&
+      isFiniteNumber(divergence.scoreDrop) &&
+      isFiniteNumber(divergence.latestScore));
+  return (
+    typeof value.goalId === "string" &&
+    typeof value.goalStatus === "string" &&
+    isFiniteNumber(value.priorWindowSize) &&
+    isFiniteNumber(value.computedSnapshot.at) &&
+    isFiniteNumber(value.computedSnapshot.completionRatio) &&
+    isFiniteNumber(value.computedSnapshot.blockedRatio) &&
+    isFiniteNumber(value.computedSnapshot.score) &&
+    isValidDivergence
+  );
+}
+
+function isPrometheusRecursionMutationEvaluationPreview(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.evaluation)) {
+    return false;
+  }
+  return (
+    typeof value.evaluation.mutationId === "string" &&
+    typeof value.evaluation.accepted === "boolean" &&
+    isFiniteNumber(value.evaluation.scoreDelta) &&
+    isFiniteNumber(value.evaluation.baselineScore) &&
+    isFiniteNumber(value.evaluation.candidateScore) &&
+    typeof value.evaluation.rationale === "string"
+  );
 }
 
 type PrometheusHandlersDeps = {
