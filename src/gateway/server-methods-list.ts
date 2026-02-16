@@ -7,6 +7,7 @@ const BASE_METHODS = [
   "channels.logout",
   "status",
   "prometheus.status",
+  "prometheus.trajectory",
   "prometheus.goals",
   "prometheus.recursion",
   "prometheus.monolith",

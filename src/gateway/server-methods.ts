@@ -80,6 +80,7 @@ const READ_METHODS = new Set([
   "config.get",
   "talk.config",
   "prometheus.status",
+  "prometheus.trajectory",
   "prometheus.goals",
   "prometheus.recursion",
   "prometheus.monolith",

@@ -45,6 +45,14 @@ function resolveTrajectoryWindowSize(params: Record<string, unknown>): number {
   return Math.max(2, Math.floor(raw));
 }
 
+function resolveSinceAt(params: Record<string, unknown>): number | undefined {
+  const raw = params.sinceAt;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return undefined;
+  }
+  return raw;
+}
+
 function resolveRecursionWindowSize(params: Record<string, unknown>): number {
   const raw = params.recursionWindowSize;
   if (typeof raw !== "number" || !Number.isFinite(raw)) {
@@ -164,6 +172,77 @@ export const prometheusHandlers: GatewayRequestHandlers = {
           },
           rootGoals,
           alignment,
+        },
+        undefined,
+      );
+    } catch (error) {
+      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+    }
+  },
+  "prometheus.trajectory": async ({ respond, params }) => {
+    try {
+      const stateDir = resolveObserverStateDir(params);
+      const goalId =
+        typeof params.goalId === "string" && params.goalId.trim().length > 0
+          ? params.goalId.trim()
+          : null;
+      if (!goalId) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "goalId is required for prometheus.trajectory"),
+        );
+        return;
+      }
+      const trajectoryWindowSize = resolveTrajectoryWindowSize(params);
+      const sinceAt = resolveSinceAt(params);
+      const eventStore = createFilePrometheusEventStore(
+        path.join(stateDir, "prometheus", "events.jsonl"),
+      );
+      const trajectoryStore = createFileHeliosTrajectoryStore(
+        path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+      );
+      const events = await eventStore.readAll();
+      const state = replayPrometheusEvents(events);
+      const goal = state.goals[goalId];
+      if (!goal) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, `Unknown goalId "${goalId}"`),
+        );
+        return;
+      }
+
+      const snapshots = await trajectoryStore.readWindow({
+        goalId,
+        maxSnapshots: trajectoryWindowSize,
+        ...(sinceAt !== undefined ? { sinceAt } : {}),
+      });
+      const divergence = detectTrajectoryDivergence({
+        snapshots,
+      });
+      const latest = snapshots[snapshots.length - 1] ?? null;
+      const previous = snapshots.length > 1 ? snapshots[snapshots.length - 2] : null;
+      const delta = latest && previous ? latest.score - previous.score : null;
+
+      respond(
+        true,
+        {
+          ts: Date.now(),
+          goal: {
+            goalId: goal.id,
+            title: goal.title,
+            status: goal.status,
+            priority: goal.priority,
+          },
+          windowSize: trajectoryWindowSize,
+          sinceAt: sinceAt ?? null,
+          snapshotCount: snapshots.length,
+          latest,
+          scoreDeltaFromPrevious: delta,
+          divergence,
+          snapshots,
         },
         undefined,
       );

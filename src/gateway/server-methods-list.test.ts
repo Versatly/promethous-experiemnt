@@ -5,6 +5,7 @@ describe("listGatewayMethods", () => {
   it("includes PROMETHEUS compatibility methods", () => {
     const methods = listGatewayMethods();
     expect(methods).toContain("prometheus.status");
+    expect(methods).toContain("prometheus.trajectory");
     expect(methods).toContain("prometheus.goals");
     expect(methods).toContain("prometheus.recursion");
     expect(methods).toContain("prometheus.monolith");

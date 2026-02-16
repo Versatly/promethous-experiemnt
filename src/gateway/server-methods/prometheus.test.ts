@@ -104,6 +104,67 @@ describe("prometheusHandlers.prometheus.status", () => {
   });
 });
 
+describe("prometheusHandlers.prometheus.trajectory", () => {
+  it("returns trajectory window and divergence for requested goal", async () => {
+    const stateDir = await makeTempDir("gateway-prometheus-trajectory-");
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-goal",
+      type: "goal.created",
+      occurredAt: 1,
+      payload: {
+        goalId: "goal-root",
+        title: "Root objective",
+        objective: "ship system",
+        priority: 100,
+      },
+    });
+    const trajectoryStore = createFileHeliosTrajectoryStore(
+      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+    );
+    await trajectoryStore.appendBatch([
+      {
+        goalId: "goal-root",
+        snapshot: { at: 10, completionRatio: 0.4, blockedRatio: 0.1, score: 0.65 },
+      },
+      {
+        goalId: "goal-root",
+        snapshot: { at: 20, completionRatio: 0.35, blockedRatio: 0.4, score: 0.2 },
+      },
+    ]);
+
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.trajectory"]({
+      req: { type: "req", id: "traj-1", method: "prometheus.trajectory" },
+      params: {
+        stateDir,
+        goalId: "goal-root",
+        trajectoryWindowSize: 10,
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        goal: expect.objectContaining({
+          goalId: "goal-root",
+        }),
+        snapshotCount: 2,
+        divergence: expect.objectContaining({
+          severity: "high",
+        }),
+      }),
+      undefined,
+    );
+  });
+});
+
 describe("prometheusHandlers.prometheus.goals", () => {
   it("returns goal tree with capability coverage summaries", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-goals-");
@@ -454,6 +515,67 @@ describe("prometheus.status gateway authorization", () => {
     const respond = vi.fn();
     await handleGatewayRequest({
       req: { type: "req", id: "read-2", method: "prometheus.status", params: {} },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: [],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("operator.read"),
+      }),
+    );
+  });
+});
+
+describe("prometheus.trajectory gateway authorization", () => {
+  it("allows operator.read scope", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "traj-read-1",
+        method: "prometheus.trajectory",
+        params: { goalId: "goal-root" },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    // Method runs after auth and fails on missing state/goal; ensure failure reason is not auth.
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining('Unknown goalId "goal-root"'),
+      }),
+    );
+  });
+
+  it("rejects calls without read or write scope", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "traj-read-2",
+        method: "prometheus.trajectory",
+        params: { goalId: "goal-root" },
+      },
       client: {
         connect: {
           role: "operator",

@@ -125,6 +125,78 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("returns HELIOS trajectory window for a specific goal", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    const trajectoryStore = createFileHeliosTrajectoryStore(
+      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-traj-goal",
+      type: "goal.created",
+      occurredAt: 8,
+      payload: {
+        goalId: "goal-traj",
+        title: "Trajectory goal",
+        objective: "Track trajectory",
+        priority: 85,
+      },
+    });
+    await trajectoryStore.appendBatch([
+      {
+        goalId: "goal-traj",
+        snapshot: {
+          at: 9,
+          completionRatio: 0.4,
+          blockedRatio: 0.1,
+          score: 0.66,
+        },
+      },
+      {
+        goalId: "goal-traj",
+        snapshot: {
+          at: 10,
+          completionRatio: 0.35,
+          blockedRatio: 0.45,
+          score: 0.18,
+        },
+      },
+    ]);
+
+    const { ws } = await harness.openClient();
+    const trajectoryP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-trajectory",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-trajectory",
+        method: "prometheus.trajectory",
+        params: {
+          goalId: "goal-traj",
+          trajectoryWindowSize: 10,
+        },
+      }),
+    );
+    const response = (await trajectoryP) as {
+      ok?: boolean;
+      payload?: {
+        goal?: { goalId?: string };
+        snapshotCount?: number;
+        divergence?: { severity?: string } | null;
+      };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.goal?.goalId).toBe("goal-traj");
+    expect(response.payload?.snapshotCount).toBe(2);
+    expect(response.payload?.divergence?.severity).toBe("high");
+    ws.close();
+  });
+
   it("returns goal/capability coverage view from prometheus.goals", async () => {
     const stateDir = resolveStateDir();
     const eventStore = createFilePrometheusEventStore(
