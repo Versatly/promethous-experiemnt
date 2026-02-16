@@ -230,4 +230,30 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       expectedMessage: "unauthorized role: 7",
     });
   });
+
+  it("keeps malformed role denial precedence over admin scopes for unknown methods", async () => {
+    const { unknownMethodHandler, authOverrides, respond } =
+      createUnknownMethodDispatchHarness("malformed unknown role");
+    await runPrometheusRoleRequest({
+      role: 7 as never,
+      request: {
+        id: "unknown-prometheus-method-malformed-role-admin-scope-short-circuit",
+        method: UNKNOWN_PROMETHEUS_METHOD,
+        params: {},
+      },
+      scopes: ["operator.admin"],
+      authOverrides,
+      extraHandlers: {
+        [UNKNOWN_PROMETHEUS_METHOD]: unknownMethodHandler,
+      },
+      respond,
+    });
+
+    expectPrometheusAuthShortCircuitBeforeDispatch({
+      respond,
+      handler: unknownMethodHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: 7",
+    });
+  });
 });

@@ -151,4 +151,30 @@ describe("PROMETHEUS gateway authorization override invocation scope (role short
       expectedMessage: "unauthorized role: 7",
     });
   });
+
+  it("keeps malformed role denial precedence over admin scopes for planned methods", async () => {
+    const { plannedExecuteHandler, authOverrides, respond } =
+      createPlannedMethodDispatchHarness("malformed role");
+    await runPrometheusRoleRequest({
+      role: 7 as never,
+      request: {
+        id: "malformed-role-admin-scope-planned-method-short-circuit",
+        method: PLANNED_METHOD,
+        params: {},
+      },
+      scopes: ["operator.admin"],
+      respond,
+      authOverrides,
+      extraHandlers: {
+        [PLANNED_METHOD]: plannedExecuteHandler,
+      },
+    });
+
+    expectPrometheusAuthShortCircuitBeforeDispatch({
+      respond,
+      handler: plannedExecuteHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: 7",
+    });
+  });
 });
