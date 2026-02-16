@@ -17,8 +17,22 @@ function resolvePrometheusHandlers(handlers?: GatewayRequestHandlers): GatewayRe
   return handlers ?? prometheusHandlers;
 }
 
+function resolvePrometheusHandler(
+  handlers: GatewayRequestHandlers,
+  method: keyof GatewayRequestHandlers,
+) {
+  const handler = handlers[method];
+  if (!handler) {
+    throw new Error(`Missing PROMETHEUS handler for method "${method}"`);
+  }
+  return handler;
+}
+
 export async function runPrometheusHandler(args: PrometheusGenericHandlerRequestArgs) {
-  await resolvePrometheusHandlers(args.handlers)[args.method]({
+  await resolvePrometheusHandler(
+    resolvePrometheusHandlers(args.handlers),
+    args.method,
+  )({
     req: {
       type: "req",
       id: args.requestId,

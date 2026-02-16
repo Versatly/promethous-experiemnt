@@ -202,4 +202,30 @@ describe("prometheus handler test helpers", () => {
       }),
     );
   });
+
+  it("throws descriptive error when generic helper target handler is missing", async () => {
+    await expect(
+      runPrometheusHandler({
+        handlers: {},
+        method: "prometheus.status",
+        requestId: "handler-helper-missing-generic",
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow('Missing PROMETHEUS handler for method "prometheus.status"');
+  });
+
+  it("throws descriptive error when wrapper helper target handler is missing", async () => {
+    await expect(
+      runPrometheusControlPreviewHandler({
+        handlers: {
+          "prometheus.control.catalog": async () => undefined,
+        },
+        requestId: "handler-helper-missing-wrapper",
+        params: {
+          action: "autarch.gap-detection",
+        },
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow('Missing PROMETHEUS handler for method "prometheus.control.preview"');
+  });
 });
