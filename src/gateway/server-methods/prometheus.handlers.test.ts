@@ -14,6 +14,7 @@ import {
 } from "./prometheus-methods.js";
 import { assertPrometheusHandlerContract, prometheusHandlers } from "./prometheus.js";
 import {
+  formatPrometheusRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
@@ -676,6 +677,11 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
                 notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
                   "prometheus.control.execute",
                 ),
+                requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+                  kind: "method",
+                  name: "prometheus.control.execute",
+                  requiredParams: ["action"],
+                }),
               },
             }),
           ]),
@@ -693,6 +699,11 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
                 notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
                   "autarch.gap-detection.commit",
                 ),
+                requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+                  kind: "action",
+                  name: "autarch.gap-detection.commit",
+                  requiredParams: ["goalId"],
+                }),
               },
             }),
           ]),

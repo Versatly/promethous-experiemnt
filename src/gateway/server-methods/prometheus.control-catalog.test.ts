@@ -6,6 +6,7 @@ import {
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
 import { PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA } from "./prometheus.control-preview.js";
 import {
+  formatPrometheusRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
@@ -89,7 +90,13 @@ describe("prometheus control catalog builder", () => {
           method.preflight.disabledMessage ===
             formatPlannedMutatingMethodDisabledMessage(method.method, method.enableEnvVar) &&
           method.preflight.notImplementedMessage ===
-            formatPlannedMutatingMethodNotImplementedMessage(method.method),
+            formatPlannedMutatingMethodNotImplementedMessage(method.method) &&
+          method.preflight.requiredParamsMessage ===
+            formatPrometheusRequiredParamsMessage({
+              kind: "method",
+              name: method.method,
+              requiredParams: method.requiredParams,
+            }),
       ),
     ).toBe(true);
     expect(
@@ -98,7 +105,13 @@ describe("prometheus control catalog builder", () => {
           action.preflight.disabledMessage ===
             formatPlannedMutatingActionDisabledMessage(action.action, action.enableEnvVar) &&
           action.preflight.notImplementedMessage ===
-            formatPlannedMutatingActionNotImplementedMessage(action.action),
+            formatPlannedMutatingActionNotImplementedMessage(action.action) &&
+          action.preflight.requiredParamsMessage ===
+            formatPrometheusRequiredParamsMessage({
+              kind: "action",
+              name: action.action,
+              requiredParams: action.requiredParams,
+            }),
       ),
     ).toBe(true);
   });

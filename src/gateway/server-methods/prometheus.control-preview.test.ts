@@ -21,6 +21,7 @@ import {
   runPrometheusControlPreview,
 } from "./prometheus.control-preview.js";
 import {
+  formatPrometheusMissingRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
 } from "./prometheus.preflight-guards.js";
@@ -269,7 +270,28 @@ describe("prometheus control preview helpers", () => {
       ok: false,
       error: {
         code: ErrorCodes.INVALID_REQUEST,
-        message: "baseline and candidate fitness snapshots are required",
+        message: formatPrometheusMissingRequiredParamsMessage({
+          kind: "action",
+          name: "recursion.mutation-evaluation",
+          missingParams: ["baseline", "candidate"],
+        }),
+      },
+    });
+  });
+
+  it("returns INVALID_REQUEST when HELIOS preview is missing required params", async () => {
+    const result = await runPrometheusControlPreview({
+      action: "helios.trajectory-evaluation",
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.INVALID_REQUEST,
+        message: formatPrometheusMissingRequiredParamsMessage({
+          kind: "action",
+          name: "helios.trajectory-evaluation",
+          missingParams: ["goalId"],
+        }),
       },
     });
   });
@@ -324,6 +346,20 @@ describe("prometheus control preview helpers", () => {
     ).toThrow("action list and metadata keys diverged");
   });
 
+  it("fails fast when active action metadata has malformed required params", () => {
+    expect(() =>
+      assertPrometheusControlPreviewActionContract({
+        actions: ["autarch.gap-detection"],
+        actionMetadata: {
+          "autarch.gap-detection": {
+            mutatesState: false,
+            requiredParams: ["goalId", "goalId"],
+          },
+        },
+      }),
+    ).toThrow("invalid required params");
+  });
+
   it("reports mutating preview actions from metadata", () => {
     expect(
       listPrometheusMutatingPreviewActions({
@@ -359,5 +395,22 @@ describe("prometheus control preview helpers", () => {
         },
       }),
     ).toThrow("overlaps active actions");
+  });
+
+  it("fails fast when planned mutating action metadata has malformed required params", () => {
+    expect(() =>
+      assertPrometheusPlannedMutatingPreviewActionContract({
+        activeActions: [],
+        plannedMutatingActionMetadata: {
+          "autarch.gap-detection.commit": {
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            requiredParams: ["goalId", "goalId"],
+            reason: "invalid params",
+          },
+        },
+      }),
+    ).toThrow("invalid required params");
   });
 });

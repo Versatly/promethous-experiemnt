@@ -14,6 +14,7 @@ import {
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
 import {
+  formatPrometheusRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
@@ -48,6 +49,7 @@ export type PrometheusControlCatalogSnapshot = {
       preflight: {
         disabledMessage: string;
         notImplementedMessage: string;
+        requiredParamsMessage: string;
       };
     }>;
     plannedMutatingPreviewActions: Array<{
@@ -60,6 +62,7 @@ export type PrometheusControlCatalogSnapshot = {
       preflight: {
         disabledMessage: string;
         notImplementedMessage: string;
+        requiredParamsMessage: string;
       };
     }>;
   };
@@ -131,6 +134,11 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
               metadata.enableEnvVar,
             ),
             notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(method),
+            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+              kind: "method",
+              name: method,
+              requiredParams: metadata.requiredParams,
+            }),
           },
         };
       }),
@@ -145,6 +153,11 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
               metadata.enableEnvVar,
             ),
             notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(action),
+            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+              kind: "action",
+              name: action,
+              requiredParams: metadata.requiredParams,
+            }),
           },
         };
       }),

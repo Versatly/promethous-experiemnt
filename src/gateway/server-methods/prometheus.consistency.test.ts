@@ -15,6 +15,7 @@ import {
 } from "./prometheus.control-preview.js";
 import { prometheusHandlers } from "./prometheus.js";
 import {
+  formatPrometheusRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
@@ -266,6 +267,7 @@ describe("prometheus adapter summary consistency", () => {
           preflight: {
             disabledMessage: string;
             notImplementedMessage: string;
+            requiredParamsMessage: string;
           };
         }>;
         plannedMutatingPreviewActions: Array<{
@@ -277,6 +279,7 @@ describe("prometheus adapter summary consistency", () => {
           preflight: {
             disabledMessage: string;
             notImplementedMessage: string;
+            requiredParamsMessage: string;
           };
         }>;
       };
@@ -354,6 +357,11 @@ describe("prometheus adapter summary consistency", () => {
             notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
               "prometheus.control.execute",
             ),
+            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+              kind: "method",
+              name: "prometheus.control.execute",
+              requiredParams: ["action"],
+            }),
           },
         }),
       ]),
@@ -374,6 +382,11 @@ describe("prometheus adapter summary consistency", () => {
             notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
               "autarch.gap-detection.commit",
             ),
+            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+              kind: "action",
+              name: "autarch.gap-detection.commit",
+              requiredParams: ["goalId"],
+            }),
           },
         }),
       ]),

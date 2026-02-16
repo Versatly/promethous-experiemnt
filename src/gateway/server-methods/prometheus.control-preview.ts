@@ -20,8 +20,10 @@ import {
   resolveTrajectoryWindowSize,
 } from "./prometheus.params.js";
 import {
+  formatPrometheusMissingRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
+  resolvePrometheusMissingRequiredParams,
 } from "./prometheus.preflight-guards.js";
 
 export const PROMETHEUS_CONTROL_PREVIEW_ACTIONS = [
@@ -150,6 +152,12 @@ export function assertPrometheusControlPreviewActionContract(args: {
         `PROMETHEUS control action contract mismatch: ${action} missing required params`,
       );
     }
+    const params = [...actionMetadata[action].requiredParams];
+    if (params.some((param) => param.length === 0) || new Set(params).size !== params.length) {
+      throw new Error(
+        `PROMETHEUS control action contract mismatch: ${action} has invalid required params`,
+      );
+    }
   }
 }
 
@@ -179,6 +187,12 @@ export function assertPrometheusPlannedMutatingPreviewActionContract(args: {
     if (!Array.isArray(metadata.requiredParams)) {
       throw new Error(
         `PROMETHEUS planned control action contract mismatch: ${action} missing required params`,
+      );
+    }
+    const params = [...metadata.requiredParams];
+    if (params.some((param) => param.length === 0) || new Set(params).size !== params.length) {
+      throw new Error(
+        `PROMETHEUS planned control action contract mismatch: ${action} has invalid required params`,
       );
     }
     if (metadata.enableEnvVar !== PROMETHEUS_MUTATING_CONTROLS_ENV) {
@@ -314,6 +328,19 @@ export async function runPrometheusControlPreview(
       return invalidRequest(`Unsupported control preview action "${rawAction}"`);
     }
     const actionMetadata = PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[rawAction];
+    const missingRequiredParams = resolvePrometheusMissingRequiredParams({
+      params,
+      requiredParams: actionMetadata.requiredParams,
+    });
+    if (missingRequiredParams.length > 0) {
+      return invalidRequest(
+        formatPrometheusMissingRequiredParamsMessage({
+          kind: "action",
+          name: rawAction,
+          missingParams: missingRequiredParams,
+        }),
+      );
+    }
 
     const stateDir = resolveObserverStateDir(params);
     const eventStore = createFilePrometheusEventStore(

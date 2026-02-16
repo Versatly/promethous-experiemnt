@@ -6,6 +6,8 @@ import {
   createFilePrometheusEventStore,
 } from "../prometheus/index.js";
 import {
+  formatPrometheusMissingRequiredParamsMessage,
+  formatPrometheusRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
@@ -714,6 +716,11 @@ describe("gateway prometheus.status", () => {
             enabled?: boolean;
             enableEnvVar?: string;
             requiredParams?: string[];
+            preflight?: {
+              disabledMessage?: string;
+              notImplementedMessage?: string;
+              requiredParamsMessage?: string;
+            };
           }>;
           plannedMutatingPreviewActions?: Array<{
             action?: string;
@@ -721,6 +728,11 @@ describe("gateway prometheus.status", () => {
             enabled?: boolean;
             enableEnvVar?: string;
             requiredParams?: string[];
+            preflight?: {
+              disabledMessage?: string;
+              notImplementedMessage?: string;
+              requiredParamsMessage?: string;
+            };
           }>;
         };
         methods?: Array<{ method?: string; access?: string; mutatesState?: boolean }>;
@@ -800,6 +812,11 @@ describe("gateway prometheus.status", () => {
               notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
                 "prometheus.control.execute",
               ),
+              requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+                kind: "method",
+                name: "prometheus.control.execute",
+                requiredParams: ["action"],
+              }),
             },
           }),
         ]),
@@ -817,6 +834,11 @@ describe("gateway prometheus.status", () => {
               notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
                 "autarch.gap-detection.commit",
               ),
+              requiredParamsMessage: formatPrometheusRequiredParamsMessage({
+                kind: "action",
+                name: "autarch.gap-detection.commit",
+                requiredParams: ["goalId"],
+              }),
             },
           }),
         ]),
@@ -1095,7 +1117,11 @@ describe("gateway prometheus.status", () => {
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("INVALID_REQUEST");
     expect(response.error?.message).toContain(
-      "baseline and candidate fitness snapshots are required",
+      formatPrometheusMissingRequiredParamsMessage({
+        kind: "action",
+        name: "recursion.mutation-evaluation",
+        missingParams: ["baseline", "candidate"],
+      }),
     );
     ws.close();
   });

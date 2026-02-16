@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatPrometheusMissingRequiredParamsMessage,
+  formatPrometheusRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
   formatPlannedMutatingMethodNotImplementedMessage,
+  resolvePrometheusMissingRequiredParams,
 } from "./prometheus.preflight-guards.js";
 
 describe("prometheus preflight guardrail messages", () => {
@@ -32,6 +35,35 @@ describe("prometheus preflight guardrail messages", () => {
     );
     expect(formatPlannedMutatingActionNotImplementedMessage("autarch.gap-detection.commit")).toBe(
       'Planned mutating action "autarch.gap-detection.commit" is not implemented yet',
+    );
+  });
+
+  it("resolves missing required params and formats reusable validation messages", () => {
+    expect(
+      resolvePrometheusMissingRequiredParams({
+        params: {
+          goalId: "   ",
+          baseline: null,
+          candidate: { objectiveFit: 0.6 },
+        },
+        requiredParams: ["goalId", "baseline", "candidate"],
+      }),
+    ).toEqual(["goalId", "baseline"]);
+    expect(
+      formatPrometheusRequiredParamsMessage({
+        kind: "action",
+        name: "recursion.mutation-evaluation",
+        requiredParams: ["proposal", "baseline", "candidate"],
+      }),
+    ).toBe('action "recursion.mutation-evaluation" requires params: proposal, baseline, candidate');
+    expect(
+      formatPrometheusMissingRequiredParamsMessage({
+        kind: "action",
+        name: "recursion.mutation-evaluation",
+        missingParams: ["baseline", "candidate"],
+      }),
+    ).toBe(
+      'action "recursion.mutation-evaluation" is missing required params: baseline, candidate',
     );
   });
 });

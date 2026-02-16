@@ -7,7 +7,10 @@ import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 import { prometheusHandlers } from "./prometheus.js";
-import { formatPlannedMutatingActionDisabledMessage } from "./prometheus.preflight-guards.js";
+import {
+  formatPrometheusMissingRequiredParamsMessage,
+  formatPlannedMutatingActionDisabledMessage,
+} from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -190,7 +193,11 @@ describe("prometheus handler error shape parity", () => {
       undefined,
       expect.objectContaining({
         code: ErrorCodes.INVALID_REQUEST,
-        message: "baseline and candidate fitness snapshots are required",
+        message: formatPrometheusMissingRequiredParamsMessage({
+          kind: "action",
+          name: "recursion.mutation-evaluation",
+          missingParams: ["baseline", "candidate"],
+        }),
       }),
     );
   });
