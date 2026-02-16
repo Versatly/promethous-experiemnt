@@ -26,6 +26,7 @@ import {
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./server-methods/prometheus-methods.js";
 import { prometheusHandlers } from "./server-methods/prometheus.js";
+import { hasPrometheusInvalidRequiredParams } from "./server-methods/prometheus.preflight-guards.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -127,6 +128,51 @@ type GatewayAuthorizationOverrides = {
   ) => ReturnType<typeof getPrometheusPlannedMutatingMethodMetadata>;
 };
 
+function isPrometheusGatewayMethodMetadataShape(
+  value: unknown,
+): value is PrometheusGatewayMethodMetadata {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<PrometheusGatewayMethodMetadata>;
+  return (
+    (candidate.access === "read" || candidate.access === "write") &&
+    typeof candidate.mutatesState === "boolean"
+  );
+}
+
+function isPrometheusPlannedMutatingMethodMetadataShape(
+  value: unknown,
+): value is NonNullable<ReturnType<typeof getPrometheusPlannedMutatingMethodMetadata>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<ReturnType<typeof getPrometheusPlannedMutatingMethodMetadata>>;
+  return (
+    candidate.access === "write" &&
+    candidate.mutatesState === true &&
+    candidate.enabled === false &&
+    typeof candidate.enableEnvVar === "string" &&
+    Array.isArray(candidate.requiredParams) &&
+    !hasPrometheusInvalidRequiredParams(candidate.requiredParams) &&
+    typeof candidate.reason === "string"
+  );
+}
+
+function isPrometheusPlannedMutatingMethodPreflightShape(
+  value: unknown,
+): value is PrometheusPlannedMutatingMethodPreflight {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<PrometheusPlannedMutatingMethodPreflight>;
+  return (
+    typeof candidate.disabledMessage === "string" &&
+    typeof candidate.notImplementedMessage === "string" &&
+    typeof candidate.requiredParamsMessage === "string"
+  );
+}
+
 function mutatingControlsDisabledError() {
   return errorShape(
     ErrorCodes.UNAVAILABLE,
@@ -144,8 +190,19 @@ export function getPrometheusMutatingControlGuardError(args: {
     env = process.env,
     resolveMethodMetadata = getPrometheusGatewayMethodMetadata,
   } = args;
-  const methodMetadata = resolveMethodMetadata(method);
-  if (methodMetadata?.mutatesState !== true) {
+  const canonicalMethodMetadata = getPrometheusGatewayMethodMetadata(method);
+  const resolvedMethodMetadata = resolveMethodMetadata(method);
+  const methodMetadata = isPrometheusGatewayMethodMetadataShape(resolvedMethodMetadata)
+    ? resolvedMethodMetadata
+    : undefined;
+  const effectiveMethodMetadata =
+    canonicalMethodMetadata && methodMetadata
+      ? methodMetadata.access === canonicalMethodMetadata.access &&
+        methodMetadata.mutatesState === canonicalMethodMetadata.mutatesState
+        ? methodMetadata
+        : canonicalMethodMetadata
+      : (methodMetadata ?? canonicalMethodMetadata);
+  if (effectiveMethodMetadata?.mutatesState !== true) {
     return undefined;
   }
   return arePrometheusMutatingControlsEnabled(env) ? undefined : mutatingControlsDisabledError();
@@ -167,20 +224,42 @@ export function getPrometheusPlannedMutatingMethodGuardError(args: {
     resolvePlannedMethodPreflight = getPrometheusPlannedMutatingMethodPreflight,
     resolvePlannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata,
   } = args;
+  const canonicalMetadata = getPrometheusPlannedMutatingMethodMetadata(method);
+  const canonicalPreflight = getPrometheusPlannedMutatingMethodPreflight(method);
+  const resolvedMetadata = resolvePlannedMethodMetadata(method);
+  const metadata = isPrometheusPlannedMutatingMethodMetadataShape(resolvedMetadata)
+    ? resolvedMetadata
+    : undefined;
+  const effectiveMetadata =
+    canonicalMetadata && metadata
+      ? metadata.access === canonicalMetadata.access &&
+        metadata.mutatesState === canonicalMetadata.mutatesState &&
+        metadata.enabled === canonicalMetadata.enabled &&
+        metadata.enableEnvVar === canonicalMetadata.enableEnvVar &&
+        metadata.reason === canonicalMetadata.reason &&
+        metadata.requiredParams.length === canonicalMetadata.requiredParams.length &&
+        metadata.requiredParams.every(
+          (requiredParam, index) => requiredParam === canonicalMetadata.requiredParams[index],
+        )
+        ? metadata
+        : canonicalMetadata
+      : (metadata ?? canonicalMetadata);
   const resolvedPreflight = resolvePlannedMethodPreflight(method);
-  const metadata = resolvePlannedMethodMetadata(method);
-  if (!resolvedPreflight && !metadata) {
+  const preflight = isPrometheusPlannedMutatingMethodPreflightShape(resolvedPreflight)
+    ? resolvedPreflight
+    : canonicalPreflight;
+  if (!preflight && !effectiveMetadata) {
     return undefined;
   }
-  const preflight =
-    resolvedPreflight ??
+  const effectivePreflight =
+    preflight ??
     buildPrometheusPlannedMutatingMethodPreflight({
       method,
-      metadata,
+      metadata: effectiveMetadata,
     });
   return arePrometheusMutatingControlsEnabled(env)
-    ? errorShape(ErrorCodes.UNAVAILABLE, preflight.notImplementedMessage)
-    : errorShape(ErrorCodes.UNAVAILABLE, preflight.disabledMessage);
+    ? errorShape(ErrorCodes.UNAVAILABLE, effectivePreflight.notImplementedMessage)
+    : errorShape(ErrorCodes.UNAVAILABLE, effectivePreflight.disabledMessage);
 }
 
 function authorizeGatewayMethod(

@@ -311,6 +311,97 @@ describe("PROMETHEUS gateway authorization", () => {
     );
   });
 
+  it("keeps planned-method UNAVAILABLE fallback at request handling when preflight resolver returns malformed shape", async () => {
+    const method = "prometheus.control.execute";
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-malformed-preflight-request-level",
+        method,
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodPreflight: () =>
+          ({
+            disabledMessage: 123,
+          }) as never,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
+
+  it("keeps planned-method UNAVAILABLE fallback at request handling when metadata resolver returns malformed shape", async () => {
+    const method = "prometheus.control.execute";
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-malformed-metadata-request-level",
+        method,
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodMetadata: () =>
+          ({
+            access: "write",
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+            requiredParams: ["action", "action"],
+            reason: "invalid required params",
+          }) as never,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
+
   it("keeps planned-action UNAVAILABLE fallback at request handling when preflight resolver misses", async () => {
     const action = "autarch.gap-detection.commit";
     const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
