@@ -787,4 +787,101 @@ describe("PROMETHEUS gateway authorization", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected catalog dependency violates canonical method coverage at request level", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "catalog-method-coverage-request-level",
+        method: "prometheus.control.catalog",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        buildControlCatalogSnapshot: () => {
+          const snapshot = buildPrometheusControlCatalogSnapshot();
+          return {
+            ...snapshot,
+            methods: snapshot.methods.map((method, index, methods) =>
+              index === methods.length - 1 ? (methods[0] ?? method) : method,
+            ),
+          } as never;
+        },
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected preview dependency violates bounded HELIOS invariants at request level", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "preview-helios-bounds-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action: "helios.trajectory-evaluation",
+          goalId: "goal-1",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: async () =>
+          ({
+            ok: true,
+            payload: {
+              ts: Date.now(),
+              action: "helios.trajectory-evaluation",
+              mutatesState: false,
+              preview: {
+                goalId: "goal-1",
+                goalStatus: "active",
+                computedSnapshot: {
+                  at: Date.now(),
+                  completionRatio: 0.8,
+                  blockedRatio: 0.5,
+                  score: 0.7,
+                },
+                priorWindowSize: 2,
+                divergence: null,
+              },
+            },
+          }) as never,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
 });
