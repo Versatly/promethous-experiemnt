@@ -790,6 +790,15 @@ describe("gateway prometheus.status", () => {
             mutatesState: true,
             enabled: false,
             enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            preflight: {
+              disabledMessage: formatPlannedMutatingMethodDisabledMessage(
+                "prometheus.control.execute",
+                "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+              ),
+              notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
+                "prometheus.control.execute",
+              ),
+            },
           }),
         ]),
         plannedMutatingPreviewActions: expect.arrayContaining([
@@ -798,6 +807,15 @@ describe("gateway prometheus.status", () => {
             mutatesState: true,
             enabled: false,
             enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            preflight: {
+              disabledMessage: formatPlannedMutatingActionDisabledMessage(
+                "autarch.gap-detection.commit",
+                "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+              ),
+              notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
+                "autarch.gap-detection.commit",
+              ),
+            },
           }),
         ]),
       }),

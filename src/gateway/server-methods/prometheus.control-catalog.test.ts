@@ -5,6 +5,12 @@ import {
 } from "./prometheus-methods.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
 import { PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA } from "./prometheus.control-preview.js";
+import {
+  formatPlannedMutatingActionDisabledMessage,
+  formatPlannedMutatingActionNotImplementedMessage,
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 describe("prometheus control catalog builder", () => {
   it("builds a consistent snapshot with summary counts", () => {
@@ -73,6 +79,24 @@ describe("prometheus control catalog builder", () => {
     expect(
       snapshot.guardrails.plannedMutatingPreviewActions.every(
         (action) => action.enableEnvVar === PROMETHEUS_MUTATING_CONTROLS_ENV,
+      ),
+    ).toBe(true);
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.every(
+        (method) =>
+          method.preflight.disabledMessage ===
+            formatPlannedMutatingMethodDisabledMessage(method.method, method.enableEnvVar) &&
+          method.preflight.notImplementedMessage ===
+            formatPlannedMutatingMethodNotImplementedMessage(method.method),
+      ),
+    ).toBe(true);
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.every(
+        (action) =>
+          action.preflight.disabledMessage ===
+            formatPlannedMutatingActionDisabledMessage(action.action, action.enableEnvVar) &&
+          action.preflight.notImplementedMessage ===
+            formatPlannedMutatingActionNotImplementedMessage(action.action),
       ),
     ).toBe(true);
   });

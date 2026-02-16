@@ -105,6 +105,9 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `guardrails`
     - includes `mutationsEnabled`, `mutatingMethods`, `plannedMutatingMethods`,
       `mutatingPreviewActions`, `plannedMutatingPreviewActions`
+    - each planned mutating method/action entry includes `preflight.disabledMessage` and
+      `preflight.notImplementedMessage` so operators can preview exact guard responses before
+      rollout
   - `methods`
   - `controlPreview`
 - `prometheus.goals`:

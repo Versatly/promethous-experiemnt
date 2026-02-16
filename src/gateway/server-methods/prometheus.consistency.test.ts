@@ -14,6 +14,12 @@ import {
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
 import { prometheusHandlers } from "./prometheus.js";
+import {
+  formatPlannedMutatingActionDisabledMessage,
+  formatPlannedMutatingActionNotImplementedMessage,
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -256,6 +262,10 @@ describe("prometheus adapter summary consistency", () => {
           mutatesState: boolean;
           enabled: boolean;
           enableEnvVar: string;
+          preflight: {
+            disabledMessage: string;
+            notImplementedMessage: string;
+          };
         }>;
         plannedMutatingPreviewActions: Array<{
           action: string;
@@ -263,6 +273,10 @@ describe("prometheus adapter summary consistency", () => {
           enabled: boolean;
           enableEnvVar: string;
           requiredParams: string[];
+          preflight: {
+            disabledMessage: string;
+            notImplementedMessage: string;
+          };
         }>;
       };
       methods: Array<{ method: string; access: string; mutatesState: boolean }>;
@@ -330,6 +344,15 @@ describe("prometheus adapter summary consistency", () => {
           mutatesState: true,
           enabled: false,
           enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+          preflight: {
+            disabledMessage: formatPlannedMutatingMethodDisabledMessage(
+              "prometheus.control.execute",
+              "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            ),
+            notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
+              "prometheus.control.execute",
+            ),
+          },
         }),
       ]),
     );
@@ -341,6 +364,15 @@ describe("prometheus adapter summary consistency", () => {
           mutatesState: true,
           enabled: false,
           enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+          preflight: {
+            disabledMessage: formatPlannedMutatingActionDisabledMessage(
+              "autarch.gap-detection.commit",
+              "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            ),
+            notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
+              "autarch.gap-detection.commit",
+            ),
+          },
         }),
       ]),
     );

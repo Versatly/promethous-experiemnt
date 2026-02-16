@@ -13,7 +13,12 @@ import {
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./prometheus-methods.js";
 import { assertPrometheusHandlerContract, prometheusHandlers } from "./prometheus.js";
-import { formatPlannedMutatingActionDisabledMessage } from "./prometheus.preflight-guards.js";
+import {
+  formatPlannedMutatingActionDisabledMessage,
+  formatPlannedMutatingActionNotImplementedMessage,
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -662,6 +667,15 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
               mutatesState: true,
               enabled: false,
               enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+              preflight: {
+                disabledMessage: formatPlannedMutatingMethodDisabledMessage(
+                  "prometheus.control.execute",
+                  "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+                ),
+                notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
+                  "prometheus.control.execute",
+                ),
+              },
             }),
           ]),
           plannedMutatingPreviewActions: expect.arrayContaining([
@@ -670,6 +684,15 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
               mutatesState: true,
               enabled: false,
               enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+              preflight: {
+                disabledMessage: formatPlannedMutatingActionDisabledMessage(
+                  "autarch.gap-detection.commit",
+                  "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+                ),
+                notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
+                  "autarch.gap-detection.commit",
+                ),
+              },
             }),
           ]),
         }),

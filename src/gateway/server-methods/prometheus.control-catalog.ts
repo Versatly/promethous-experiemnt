@@ -13,6 +13,12 @@ import {
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
+import {
+  formatPlannedMutatingActionDisabledMessage,
+  formatPlannedMutatingActionNotImplementedMessage,
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 export type PrometheusControlCatalogSnapshot = {
   ts: number;
@@ -38,6 +44,10 @@ export type PrometheusControlCatalogSnapshot = {
       enabled: boolean;
       enableEnvVar: string;
       reason: string;
+      preflight: {
+        disabledMessage: string;
+        notImplementedMessage: string;
+      };
     }>;
     plannedMutatingPreviewActions: Array<{
       action: string;
@@ -46,6 +56,10 @@ export type PrometheusControlCatalogSnapshot = {
       enableEnvVar: string;
       requiredParams: readonly string[];
       reason: string;
+      preflight: {
+        disabledMessage: string;
+        notImplementedMessage: string;
+      };
     }>;
   };
   methods: Array<{
@@ -105,14 +119,34 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
       enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
       mutatingMethods,
       mutatingPreviewActions,
-      plannedMutatingMethods: plannedMutatingMethods.map((method) => ({
-        method,
-        ...PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method],
-      })),
-      plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => ({
-        action,
-        ...PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA[action],
-      })),
+      plannedMutatingMethods: plannedMutatingMethods.map((method) => {
+        const metadata = PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method];
+        return {
+          method,
+          ...metadata,
+          preflight: {
+            disabledMessage: formatPlannedMutatingMethodDisabledMessage(
+              method,
+              metadata.enableEnvVar,
+            ),
+            notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(method),
+          },
+        };
+      }),
+      plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => {
+        const metadata = PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA[action];
+        return {
+          action,
+          ...metadata,
+          preflight: {
+            disabledMessage: formatPlannedMutatingActionDisabledMessage(
+              action,
+              metadata.enableEnvVar,
+            ),
+            notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(action),
+          },
+        };
+      }),
     },
     methods,
     controlPreview: {
