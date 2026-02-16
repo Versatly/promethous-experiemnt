@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildPrometheusPlannedMutatingMethodPreflight,
   getPrometheusPlannedMutatingMethodMetadata,
+  getPrometheusPlannedMutatingMethodPreflight,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
 } from "./prometheus-methods.js";
@@ -149,6 +150,31 @@ describe("prometheus control catalog builder", () => {
         reason: metadata.reason,
         requiredParams: metadata.requiredParams,
       }),
+    );
+  });
+
+  it("queries planned mutating method resolvers only for canonical planned method keys", () => {
+    const plannedMethodKeys = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted();
+    const resolvePlannedMethodMetadata = vi.fn((method: string) =>
+      getPrometheusPlannedMutatingMethodMetadata(method),
+    );
+    const resolvePlannedMethodPreflight = vi.fn((method: string) =>
+      getPrometheusPlannedMutatingMethodPreflight(method),
+    );
+
+    buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedMethodMetadata,
+      resolvePlannedMethodPreflight,
+    });
+
+    expect(resolvePlannedMethodMetadata).toHaveBeenCalledTimes(plannedMethodKeys.length);
+    expect(resolvePlannedMethodPreflight).toHaveBeenCalledTimes(plannedMethodKeys.length);
+    expect(resolvePlannedMethodMetadata.mock.calls.map(([method]) => method).toSorted()).toEqual(
+      plannedMethodKeys,
+    );
+    expect(resolvePlannedMethodPreflight.mock.calls.map(([method]) => method).toSorted()).toEqual(
+      plannedMethodKeys,
     );
   });
 

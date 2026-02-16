@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
+  getPrometheusPlannedMutatingPreviewActionPreflight,
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
 
@@ -206,6 +207,33 @@ describe("prometheus control catalog builder (planned preview-action fallback)",
         reason: canonicalMetadata.reason,
         requiredParams: canonicalMetadata.requiredParams,
       }),
+    );
+  });
+
+  it("queries planned mutating action resolvers only for canonical planned action keys", () => {
+    const plannedActionKeys = Object.keys(
+      PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
+    ).toSorted();
+    const resolvePlannedActionMetadata = vi.fn((action: string) =>
+      getPrometheusPlannedMutatingPreviewActionMetadata(action),
+    );
+    const resolvePlannedActionPreflight = vi.fn((action: string) =>
+      getPrometheusPlannedMutatingPreviewActionPreflight(action),
+    );
+
+    buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedActionMetadata,
+      resolvePlannedActionPreflight,
+    });
+
+    expect(resolvePlannedActionMetadata).toHaveBeenCalledTimes(plannedActionKeys.length);
+    expect(resolvePlannedActionPreflight).toHaveBeenCalledTimes(plannedActionKeys.length);
+    expect(resolvePlannedActionMetadata.mock.calls.map(([action]) => action).toSorted()).toEqual(
+      plannedActionKeys,
+    );
+    expect(resolvePlannedActionPreflight.mock.calls.map(([action]) => action).toSorted()).toEqual(
+      plannedActionKeys,
     );
   });
 });
