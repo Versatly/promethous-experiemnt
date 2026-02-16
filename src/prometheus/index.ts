@@ -2,6 +2,7 @@ export * from "./event-store.js";
 export * from "./events.js";
 export * from "./autarch/cycle.js";
 export * from "./autarch/gap-detection.js";
+export * from "./autarch/pipeline.js";
 export * from "./autarch/registry.js";
 export * from "./autarch/workflow.js";
 export * from "./helios/decomposition.js";
