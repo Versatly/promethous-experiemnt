@@ -284,7 +284,7 @@ export type PrometheusControlPreviewResult =
   | PrometheusControlPreviewSuccess
   | PrometheusControlPreviewFailure;
 
-type PrometheusControlPreviewDeps = {
+export type PrometheusControlPreviewDeps = {
   resolvePlannedActionPreflight?: (
     action: string,
   ) => PrometheusPlannedMutatingPreviewActionPreflight | undefined;

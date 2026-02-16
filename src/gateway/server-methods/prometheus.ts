@@ -17,7 +17,10 @@ import {
   type PrometheusGatewayMethodMetadata,
 } from "./prometheus-methods.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
-import { runPrometheusControlPreview } from "./prometheus.control-preview.js";
+import {
+  runPrometheusControlPreview,
+  type PrometheusControlPreviewDeps,
+} from "./prometheus.control-preview.js";
 import {
   CAPITAL_FORMS,
   type CapitalForm,
@@ -46,465 +49,484 @@ export function assertPrometheusHandlerContract(args: {
   }
 }
 
-export const prometheusHandlers: GatewayRequestHandlers = {
-  "prometheus.status": async ({ respond, params }) => {
-    try {
-      const stateDir = resolveObserverStateDir(params);
-      const eventLogPath = path.join(stateDir, "prometheus", "events.jsonl");
-      const trajectoryLogPath = path.join(stateDir, "prometheus", "helios-trajectory.jsonl");
-      const eventStore = createFilePrometheusEventStore(eventLogPath);
-      const trajectoryStore = createFileHeliosTrajectoryStore(trajectoryLogPath);
-      const events = await eventStore.readAll();
-      const state = replayPrometheusEvents(events);
-      const rootGoalDefaults = Object.values(state.goals)
-        .filter((goal) => !goal.parentGoalId)
-        .map((goal) => goal.id);
-      const rootGoalIds = resolveRootGoalIds(params, rootGoalDefaults).filter((goalId) =>
-        Boolean(state.goals[goalId]),
-      );
-      const trajectoryWindowSize = resolveTrajectoryWindowSize(params);
+type PrometheusHandlersDeps = {
+  buildControlCatalogSnapshot?: typeof buildPrometheusControlCatalogSnapshot;
+  runControlPreview?: (
+    params: Record<string, unknown>,
+    deps?: PrometheusControlPreviewDeps,
+  ) => ReturnType<typeof runPrometheusControlPreview>;
+  controlPreviewDeps?: PrometheusControlPreviewDeps;
+};
 
-      const rootGoals = await Promise.all(
-        rootGoalIds.map(async (goalId) => {
-          const goal = state.goals[goalId];
-          const snapshots = await trajectoryStore.readWindow({
-            goalId,
-            maxSnapshots: trajectoryWindowSize,
-          });
-          const latest = snapshots[snapshots.length - 1] ?? null;
-          const divergence = detectTrajectoryDivergence({ snapshots });
-          return {
-            goalId,
-            title: goal?.title,
-            status: goal?.status,
-            latestTrajectory: latest,
-            divergence,
-            snapshotCount: snapshots.length,
-          };
-        }),
-      );
+export function createPrometheusHandlers(deps?: PrometheusHandlersDeps): GatewayRequestHandlers {
+  const buildControlCatalogSnapshot =
+    deps?.buildControlCatalogSnapshot ?? buildPrometheusControlCatalogSnapshot;
+  const runControlPreview = deps?.runControlPreview ?? runPrometheusControlPreview;
+  const controlPreviewDeps = deps?.controlPreviewDeps;
+  return {
+    "prometheus.status": async ({ respond, params }) => {
+      try {
+        const stateDir = resolveObserverStateDir(params);
+        const eventLogPath = path.join(stateDir, "prometheus", "events.jsonl");
+        const trajectoryLogPath = path.join(stateDir, "prometheus", "helios-trajectory.jsonl");
+        const eventStore = createFilePrometheusEventStore(eventLogPath);
+        const trajectoryStore = createFileHeliosTrajectoryStore(trajectoryLogPath);
+        const events = await eventStore.readAll();
+        const state = replayPrometheusEvents(events);
+        const rootGoalDefaults = Object.values(state.goals)
+          .filter((goal) => !goal.parentGoalId)
+          .map((goal) => goal.id);
+        const rootGoalIds = resolveRootGoalIds(params, rootGoalDefaults).filter((goalId) =>
+          Boolean(state.goals[goalId]),
+        );
+        const trajectoryWindowSize = resolveTrajectoryWindowSize(params);
 
-      const alignment = evaluateAlignmentGuardrails({ state });
-      const unresolvedGapCount = Object.values(state.capabilityGaps).filter(
-        (gap) => !gap.resolvedAt,
-      ).length;
+        const rootGoals = await Promise.all(
+          rootGoalIds.map(async (goalId) => {
+            const goal = state.goals[goalId];
+            const snapshots = await trajectoryStore.readWindow({
+              goalId,
+              maxSnapshots: trajectoryWindowSize,
+            });
+            const latest = snapshots[snapshots.length - 1] ?? null;
+            const divergence = detectTrajectoryDivergence({ snapshots });
+            return {
+              goalId,
+              title: goal?.title,
+              status: goal?.status,
+              latestTrajectory: latest,
+              divergence,
+              snapshotCount: snapshots.length,
+            };
+          }),
+        );
 
-      respond(
-        true,
-        {
-          ts: Date.now(),
-          eventCount: events.length,
-          summary: {
-            goals: Object.keys(state.goals).length,
-            blockedGoals: Object.values(state.goals).filter((goal) => goal.status === "blocked")
-              .length,
-            capabilityGaps: Object.keys(state.capabilityGaps).length,
-            unresolvedCapabilityGaps: unresolvedGapCount,
-            synthesizedCapabilities: Object.keys(state.synthesizedCapabilities).length,
-            institutions: Object.keys(state.institutions).length,
-            capitalAllocations: Object.keys(state.capitalLedger).length,
-            recursionCycles: state.recursionCycles.length,
+        const alignment = evaluateAlignmentGuardrails({ state });
+        const unresolvedGapCount = Object.values(state.capabilityGaps).filter(
+          (gap) => !gap.resolvedAt,
+        ).length;
+
+        respond(
+          true,
+          {
+            ts: Date.now(),
+            eventCount: events.length,
+            summary: {
+              goals: Object.keys(state.goals).length,
+              blockedGoals: Object.values(state.goals).filter((goal) => goal.status === "blocked")
+                .length,
+              capabilityGaps: Object.keys(state.capabilityGaps).length,
+              unresolvedCapabilityGaps: unresolvedGapCount,
+              synthesizedCapabilities: Object.keys(state.synthesizedCapabilities).length,
+              institutions: Object.keys(state.institutions).length,
+              capitalAllocations: Object.keys(state.capitalLedger).length,
+              recursionCycles: state.recursionCycles.length,
+            },
+            rootGoals,
+            alignment,
           },
-          rootGoals,
-          alignment,
-        },
-        undefined,
-      );
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
-    }
-  },
-  "prometheus.trajectory": async ({ respond, params }) => {
-    try {
-      const stateDir = resolveObserverStateDir(params);
-      const goalId =
-        typeof params.goalId === "string" && params.goalId.trim().length > 0
-          ? params.goalId.trim()
-          : null;
-      if (!goalId) {
-        respond(
-          false,
           undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, "goalId is required for prometheus.trajectory"),
         );
-        return;
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
       }
-      const trajectoryWindowSize = resolveTrajectoryWindowSize(params);
-      const sinceAt = resolveSinceAt(params);
-      const eventStore = createFilePrometheusEventStore(
-        path.join(stateDir, "prometheus", "events.jsonl"),
-      );
-      const trajectoryStore = createFileHeliosTrajectoryStore(
-        path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
-      );
-      const events = await eventStore.readAll();
-      const state = replayPrometheusEvents(events);
-      const goal = state.goals[goalId];
-      if (!goal) {
+    },
+    "prometheus.trajectory": async ({ respond, params }) => {
+      try {
+        const stateDir = resolveObserverStateDir(params);
+        const goalId =
+          typeof params.goalId === "string" && params.goalId.trim().length > 0
+            ? params.goalId.trim()
+            : null;
+        if (!goalId) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, "goalId is required for prometheus.trajectory"),
+          );
+          return;
+        }
+        const trajectoryWindowSize = resolveTrajectoryWindowSize(params);
+        const sinceAt = resolveSinceAt(params);
+        const eventStore = createFilePrometheusEventStore(
+          path.join(stateDir, "prometheus", "events.jsonl"),
+        );
+        const trajectoryStore = createFileHeliosTrajectoryStore(
+          path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+        );
+        const events = await eventStore.readAll();
+        const state = replayPrometheusEvents(events);
+        const goal = state.goals[goalId];
+        if (!goal) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, `Unknown goalId "${goalId}"`),
+          );
+          return;
+        }
+
+        const snapshots = await trajectoryStore.readWindow({
+          goalId,
+          maxSnapshots: trajectoryWindowSize,
+          ...(sinceAt !== undefined ? { sinceAt } : {}),
+        });
+        const divergence = detectTrajectoryDivergence({
+          snapshots,
+        });
+        const latest = snapshots[snapshots.length - 1] ?? null;
+        const previous = snapshots.length > 1 ? snapshots[snapshots.length - 2] : null;
+        const delta = latest && previous ? latest.score - previous.score : null;
+
         respond(
-          false,
+          true,
+          {
+            ts: Date.now(),
+            goal: {
+              goalId: goal.id,
+              title: goal.title,
+              status: goal.status,
+              priority: goal.priority,
+            },
+            windowSize: trajectoryWindowSize,
+            sinceAt: sinceAt ?? null,
+            snapshotCount: snapshots.length,
+            latest,
+            scoreDeltaFromPrevious: delta,
+            divergence,
+            snapshots,
+          },
           undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, `Unknown goalId "${goalId}"`),
         );
-        return;
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
       }
-
-      const snapshots = await trajectoryStore.readWindow({
-        goalId,
-        maxSnapshots: trajectoryWindowSize,
-        ...(sinceAt !== undefined ? { sinceAt } : {}),
-      });
-      const divergence = detectTrajectoryDivergence({
-        snapshots,
-      });
-      const latest = snapshots[snapshots.length - 1] ?? null;
-      const previous = snapshots.length > 1 ? snapshots[snapshots.length - 2] : null;
-      const delta = latest && previous ? latest.score - previous.score : null;
-
-      respond(
-        true,
-        {
-          ts: Date.now(),
-          goal: {
+    },
+    "prometheus.goals": async ({ respond, params }) => {
+      try {
+        const stateDir = resolveObserverStateDir(params);
+        const eventStore = createFilePrometheusEventStore(
+          path.join(stateDir, "prometheus", "events.jsonl"),
+        );
+        const events = await eventStore.readAll();
+        const state = replayPrometheusEvents(events);
+        const graph = buildCapabilityGraph({ state });
+        const goals = Object.values(state.goals)
+          .toSorted((left, right) => right.priority - left.priority)
+          .map((goal) => ({
             goalId: goal.id,
             title: goal.title,
             status: goal.status,
             priority: goal.priority,
+            parentGoalId: goal.parentGoalId,
+            childGoalIds: goal.childGoalIds,
+            capabilityCoverage: graph.coverageByGoal[goal.id] ?? {
+              goalId: goal.id,
+              capabilityIds: [],
+              integratedCount: 0,
+              provisionalCount: 0,
+              unresolvedGapIds: [],
+            },
+          }));
+        respond(
+          true,
+          {
+            ts: Date.now(),
+            total: goals.length,
+            goals,
           },
-          windowSize: trajectoryWindowSize,
-          sinceAt: sinceAt ?? null,
-          snapshotCount: snapshots.length,
-          latest,
-          scoreDeltaFromPrevious: delta,
-          divergence,
-          snapshots,
-        },
-        undefined,
-      );
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
-    }
-  },
-  "prometheus.goals": async ({ respond, params }) => {
-    try {
-      const stateDir = resolveObserverStateDir(params);
-      const eventStore = createFilePrometheusEventStore(
-        path.join(stateDir, "prometheus", "events.jsonl"),
-      );
-      const events = await eventStore.readAll();
-      const state = replayPrometheusEvents(events);
-      const graph = buildCapabilityGraph({ state });
-      const goals = Object.values(state.goals)
-        .toSorted((left, right) => right.priority - left.priority)
-        .map((goal) => ({
-          goalId: goal.id,
-          title: goal.title,
-          status: goal.status,
-          priority: goal.priority,
-          parentGoalId: goal.parentGoalId,
-          childGoalIds: goal.childGoalIds,
-          capabilityCoverage: graph.coverageByGoal[goal.id] ?? {
-            goalId: goal.id,
-            capabilityIds: [],
-            integratedCount: 0,
-            provisionalCount: 0,
-            unresolvedGapIds: [],
+          undefined,
+        );
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+      }
+    },
+    "prometheus.recursion": async ({ respond, params }) => {
+      try {
+        const stateDir = resolveObserverStateDir(params);
+        const eventStore = createFilePrometheusEventStore(
+          path.join(stateDir, "prometheus", "events.jsonl"),
+        );
+        const events = await eventStore.readAll();
+        const state = replayPrometheusEvents(events);
+        const recursionWindowSize = resolveRecursionWindowSize(params);
+        const cycles = state.recursionCycles
+          .slice(-recursionWindowSize)
+          .toReversed()
+          .map((cycle) => ({
+            cycleId: cycle.cycleId,
+            occurredAt: cycle.occurredAt,
+            summary: cycle.summary,
+            mutationId: cycle.mutationId,
+            accepted: cycle.accepted,
+            evaluationScore: cycle.evaluationScore,
+            rollbackOfCycleId: cycle.rollbackOfCycleId,
+            rationale: cycle.rationale,
+          }));
+        const accepted = cycles.filter((cycle) => cycle.accepted === true).length;
+        const rejected = cycles.filter((cycle) => cycle.accepted === false).length;
+        const rollbackCount = cycles.filter(
+          (cycle) => typeof cycle.rollbackOfCycleId === "string",
+        ).length;
+        const acceptanceRatio = cycles.length === 0 ? 0 : accepted / cycles.length;
+
+        respond(
+          true,
+          {
+            ts: Date.now(),
+            windowSize: recursionWindowSize,
+            totals: {
+              totalCycles: state.recursionCycles.length,
+              accepted,
+              rejected,
+              rollbackCount,
+              acceptanceRatio,
+            },
+            cycles,
           },
-        }));
-      respond(
-        true,
-        {
-          ts: Date.now(),
-          total: goals.length,
-          goals,
-        },
-        undefined,
-      );
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
-    }
-  },
-  "prometheus.recursion": async ({ respond, params }) => {
-    try {
-      const stateDir = resolveObserverStateDir(params);
-      const eventStore = createFilePrometheusEventStore(
-        path.join(stateDir, "prometheus", "events.jsonl"),
-      );
-      const events = await eventStore.readAll();
-      const state = replayPrometheusEvents(events);
-      const recursionWindowSize = resolveRecursionWindowSize(params);
-      const cycles = state.recursionCycles
-        .slice(-recursionWindowSize)
-        .toReversed()
-        .map((cycle) => ({
-          cycleId: cycle.cycleId,
-          occurredAt: cycle.occurredAt,
-          summary: cycle.summary,
-          mutationId: cycle.mutationId,
-          accepted: cycle.accepted,
-          evaluationScore: cycle.evaluationScore,
-          rollbackOfCycleId: cycle.rollbackOfCycleId,
-          rationale: cycle.rationale,
-        }));
-      const accepted = cycles.filter((cycle) => cycle.accepted === true).length;
-      const rejected = cycles.filter((cycle) => cycle.accepted === false).length;
-      const rollbackCount = cycles.filter(
-        (cycle) => typeof cycle.rollbackOfCycleId === "string",
-      ).length;
-      const acceptanceRatio = cycles.length === 0 ? 0 : accepted / cycles.length;
+          undefined,
+        );
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+      }
+    },
+    "prometheus.autarch": async ({ respond, params }) => {
+      try {
+        const stateDir = resolveObserverStateDir(params);
+        const eventStore = createFilePrometheusEventStore(
+          path.join(stateDir, "prometheus", "events.jsonl"),
+        );
+        const events = await eventStore.readAll();
+        const state = replayPrometheusEvents(events);
+        const graph = buildCapabilityGraph({ state });
+        const severityFilter = isGapSeverity(params.severity) ? params.severity : null;
+        const includeResolved = params.includeResolved === true;
+        const maxItems = resolveMaxItems(params, 100);
 
-      respond(
-        true,
-        {
-          ts: Date.now(),
-          windowSize: recursionWindowSize,
-          totals: {
-            totalCycles: state.recursionCycles.length,
-            accepted,
-            rejected,
-            rollbackCount,
-            acceptanceRatio,
+        const gaps = Object.values(state.capabilityGaps)
+          .filter((gap) => (includeResolved ? true : !gap.resolvedAt))
+          .filter((gap) => (severityFilter ? gap.severity === severityFilter : true))
+          .toSorted((left, right) => {
+            if (left.createdAt === right.createdAt) {
+              return left.id.localeCompare(right.id);
+            }
+            return right.createdAt - left.createdAt;
+          })
+          .slice(0, maxItems)
+          .map((gap) => ({
+            gapId: gap.id,
+            goalId: gap.goalId,
+            goalTitle: state.goals[gap.goalId]?.title,
+            severity: gap.severity,
+            description: gap.description,
+            createdAt: gap.createdAt,
+            resolvedAt: gap.resolvedAt,
+            hasSynthesizedCapability: Object.values(state.synthesizedCapabilities).some(
+              (capability) => capability.gapId === gap.id,
+            ),
+          }));
+
+        const capabilities = Object.values(state.synthesizedCapabilities)
+          .toSorted((left, right) => {
+            if (left.updatedAt === right.updatedAt) {
+              return left.id.localeCompare(right.id);
+            }
+            return right.updatedAt - left.updatedAt;
+          })
+          .slice(0, maxItems)
+          .map((capability) => {
+            const gap = state.capabilityGaps[capability.gapId];
+            return {
+              capabilityId: capability.id,
+              name: capability.name,
+              status: capability.status,
+              gapId: capability.gapId,
+              goalId: gap?.goalId,
+              goalTitle: gap ? state.goals[gap.goalId]?.title : undefined,
+              createdAt: capability.createdAt,
+              updatedAt: capability.updatedAt,
+            };
+          });
+
+        const statusCounts = Object.values(state.synthesizedCapabilities).reduce(
+          (accumulator, capability) => {
+            accumulator[capability.status] += 1;
+            return accumulator;
           },
-          cycles,
-        },
-        undefined,
-      );
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
-    }
-  },
-  "prometheus.autarch": async ({ respond, params }) => {
-    try {
-      const stateDir = resolveObserverStateDir(params);
-      const eventStore = createFilePrometheusEventStore(
-        path.join(stateDir, "prometheus", "events.jsonl"),
-      );
-      const events = await eventStore.readAll();
-      const state = replayPrometheusEvents(events);
-      const graph = buildCapabilityGraph({ state });
-      const severityFilter = isGapSeverity(params.severity) ? params.severity : null;
-      const includeResolved = params.includeResolved === true;
-      const maxItems = resolveMaxItems(params, 100);
+          {
+            proposed: 0,
+            validated: 0,
+            integrated: 0,
+            rejected: 0,
+          } as Record<"proposed" | "validated" | "integrated" | "rejected", number>,
+        );
 
-      const gaps = Object.values(state.capabilityGaps)
-        .filter((gap) => (includeResolved ? true : !gap.resolvedAt))
-        .filter((gap) => (severityFilter ? gap.severity === severityFilter : true))
-        .toSorted((left, right) => {
-          if (left.createdAt === right.createdAt) {
-            return left.id.localeCompare(right.id);
-          }
-          return right.createdAt - left.createdAt;
-        })
-        .slice(0, maxItems)
-        .map((gap) => ({
-          gapId: gap.id,
-          goalId: gap.goalId,
-          goalTitle: state.goals[gap.goalId]?.title,
-          severity: gap.severity,
-          description: gap.description,
-          createdAt: gap.createdAt,
-          resolvedAt: gap.resolvedAt,
-          hasSynthesizedCapability: Object.values(state.synthesizedCapabilities).some(
-            (capability) => capability.gapId === gap.id,
-          ),
-        }));
+        const unresolvedGaps = Object.values(state.capabilityGaps).filter((gap) => !gap.resolvedAt);
+        const criticalUnresolved = unresolvedGaps.filter((gap) => gap.severity === "critical");
+        const goalsWithUnresolvedGaps = Array.from(
+          new Set(unresolvedGaps.map((gap) => gap.goalId)),
+        );
 
-      const capabilities = Object.values(state.synthesizedCapabilities)
-        .toSorted((left, right) => {
-          if (left.updatedAt === right.updatedAt) {
-            return left.id.localeCompare(right.id);
-          }
-          return right.updatedAt - left.updatedAt;
-        })
-        .slice(0, maxItems)
-        .map((capability) => {
-          const gap = state.capabilityGaps[capability.gapId];
-          return {
-            capabilityId: capability.id,
-            name: capability.name,
-            status: capability.status,
-            gapId: capability.gapId,
-            goalId: gap?.goalId,
-            goalTitle: gap ? state.goals[gap.goalId]?.title : undefined,
-            createdAt: capability.createdAt,
-            updatedAt: capability.updatedAt,
-          };
-        });
-
-      const statusCounts = Object.values(state.synthesizedCapabilities).reduce(
-        (accumulator, capability) => {
-          accumulator[capability.status] += 1;
-          return accumulator;
-        },
-        {
-          proposed: 0,
-          validated: 0,
-          integrated: 0,
-          rejected: 0,
-        } as Record<"proposed" | "validated" | "integrated" | "rejected", number>,
-      );
-
-      const unresolvedGaps = Object.values(state.capabilityGaps).filter((gap) => !gap.resolvedAt);
-      const criticalUnresolved = unresolvedGaps.filter((gap) => gap.severity === "critical");
-      const goalsWithUnresolvedGaps = Array.from(new Set(unresolvedGaps.map((gap) => gap.goalId)));
-
-      respond(
-        true,
-        {
-          ts: Date.now(),
-          summary: {
-            capabilityGaps: Object.keys(state.capabilityGaps).length,
-            unresolvedCapabilityGaps: unresolvedGaps.length,
-            criticalUnresolvedCapabilityGaps: criticalUnresolved.length,
-            synthesizedCapabilities: Object.keys(state.synthesizedCapabilities).length,
-            synthesizedByStatus: statusCounts,
-            goalsWithUnresolvedGaps: goalsWithUnresolvedGaps.length,
+        respond(
+          true,
+          {
+            ts: Date.now(),
+            summary: {
+              capabilityGaps: Object.keys(state.capabilityGaps).length,
+              unresolvedCapabilityGaps: unresolvedGaps.length,
+              criticalUnresolvedCapabilityGaps: criticalUnresolved.length,
+              synthesizedCapabilities: Object.keys(state.synthesizedCapabilities).length,
+              synthesizedByStatus: statusCounts,
+              goalsWithUnresolvedGaps: goalsWithUnresolvedGaps.length,
+            },
+            graph: {
+              capabilityNodes: Object.keys(graph.capabilities).length,
+              edgeCount: graph.edges.length,
+            },
+            goalsWithUnresolvedGaps,
+            gaps,
+            capabilities,
           },
-          graph: {
-            capabilityNodes: Object.keys(graph.capabilities).length,
-            edgeCount: graph.edges.length,
+          undefined,
+        );
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+      }
+    },
+    "prometheus.control.catalog": async ({ respond }) => {
+      try {
+        const catalog = buildControlCatalogSnapshot();
+        respond(true, catalog, undefined);
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+      }
+    },
+    "prometheus.control.preview": async ({ respond, params }) => {
+      const result = await runControlPreview(params, controlPreviewDeps);
+      if (!result.ok) {
+        respond(false, undefined, errorShape(result.error.code, result.error.message));
+        return;
+      }
+      respond(true, result.payload, undefined);
+    },
+    "prometheus.monolith": async ({ respond, params }) => {
+      try {
+        const stateDir = resolveObserverStateDir(params);
+        const eventStore = createFilePrometheusEventStore(
+          path.join(stateDir, "prometheus", "events.jsonl"),
+        );
+        const events = await eventStore.readAll();
+        const state = replayPrometheusEvents(events);
+        const demands = resolveCapitalDemands(params);
+        const capitalByInstitution = Object.values(state.capitalLedger).reduce(
+          (accumulator, entry) => {
+            const byForm = accumulator[entry.institutionId] ?? {
+              money: 0,
+              compute: 0,
+              materials: 0,
+              labor: 0,
+              political: 0,
+              data: 0,
+            };
+            byForm[entry.form] += entry.amount;
+            accumulator[entry.institutionId] = byForm;
+            return accumulator;
           },
-          goalsWithUnresolvedGaps,
-          gaps,
-          capabilities,
-        },
-        undefined,
-      );
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
-    }
-  },
-  "prometheus.control.catalog": async ({ respond }) => {
-    try {
-      const catalog = buildPrometheusControlCatalogSnapshot();
-      respond(true, catalog, undefined);
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
-    }
-  },
-  "prometheus.control.preview": async ({ respond, params }) => {
-    const result = await runPrometheusControlPreview(params);
-    if (!result.ok) {
-      respond(false, undefined, errorShape(result.error.code, result.error.message));
-      return;
-    }
-    respond(true, result.payload, undefined);
-  },
-  "prometheus.monolith": async ({ respond, params }) => {
-    try {
-      const stateDir = resolveObserverStateDir(params);
-      const eventStore = createFilePrometheusEventStore(
-        path.join(stateDir, "prometheus", "events.jsonl"),
-      );
-      const events = await eventStore.readAll();
-      const state = replayPrometheusEvents(events);
-      const demands = resolveCapitalDemands(params);
-      const capitalByInstitution = Object.values(state.capitalLedger).reduce(
-        (accumulator, entry) => {
-          const byForm = accumulator[entry.institutionId] ?? {
+          {} as Record<string, Record<CapitalForm, number>>,
+        );
+        const totalsByForm = Object.values(capitalByInstitution).reduce(
+          (totals, capital) => {
+            for (const form of CAPITAL_FORMS) {
+              totals[form] += capital[form] ?? 0;
+            }
+            return totals;
+          },
+          {
             money: 0,
             compute: 0,
             materials: 0,
             labor: 0,
             political: 0,
             data: 0,
-          };
-          byForm[entry.form] += entry.amount;
-          accumulator[entry.institutionId] = byForm;
-          return accumulator;
-        },
-        {} as Record<string, Record<CapitalForm, number>>,
-      );
-      const totalsByForm = Object.values(capitalByInstitution).reduce(
-        (totals, capital) => {
-          for (const form of CAPITAL_FORMS) {
-            totals[form] += capital[form] ?? 0;
-          }
-          return totals;
-        },
-        {
-          money: 0,
-          compute: 0,
-          materials: 0,
-          labor: 0,
-          political: 0,
-          data: 0,
-        } as Record<CapitalForm, number>,
-      );
+          } as Record<CapitalForm, number>,
+        );
 
-      const institutions = Object.values(state.institutions)
-        .toSorted((left, right) => left.name.localeCompare(right.name))
-        .map((institution) => ({
-          institutionId: institution.id,
-          name: institution.name,
-          status: institution.status,
-          mandate: institution.mandate,
-          authorityModel: institution.authorityModel,
-          capital: capitalByInstitution[institution.id] ?? {
-            money: 0,
-            compute: 0,
-            materials: 0,
-            labor: 0,
-            political: 0,
-            data: 0,
-          },
-        }));
+        const institutions = Object.values(state.institutions)
+          .toSorted((left, right) => left.name.localeCompare(right.name))
+          .map((institution) => ({
+            institutionId: institution.id,
+            name: institution.name,
+            status: institution.status,
+            mandate: institution.mandate,
+            authorityModel: institution.authorityModel,
+            capital: capitalByInstitution[institution.id] ?? {
+              money: 0,
+              compute: 0,
+              materials: 0,
+              labor: 0,
+              political: 0,
+              data: 0,
+            },
+          }));
 
-      const allocationPreview =
-        demands.length > 0
-          ? (() => {
-              const plan = planCapitalAllocations({
-                state,
-                demands,
-              });
-              const governanceChecks = plan.allocations.map((allocation) => ({
-                ...allocation,
-                decision: evaluateInstitutionAction({
+        const allocationPreview =
+          demands.length > 0
+            ? (() => {
+                const plan = planCapitalAllocations({
                   state,
-                  request: {
-                    institutionId: allocation.institutionId,
-                    type: "capital.allocate",
-                    form: allocation.form,
-                    amount: allocation.amount,
-                  },
-                }),
-              }));
-              return {
-                requestedDemands: demands.length,
-                allocations: plan.allocations,
-                unmetDemands: plan.unmetDemands,
-                governanceChecks,
-              };
-            })()
-          : null;
+                  demands,
+                });
+                const governanceChecks = plan.allocations.map((allocation) => ({
+                  ...allocation,
+                  decision: evaluateInstitutionAction({
+                    state,
+                    request: {
+                      institutionId: allocation.institutionId,
+                      type: "capital.allocate",
+                      form: allocation.form,
+                      amount: allocation.amount,
+                    },
+                  }),
+                }));
+                return {
+                  requestedDemands: demands.length,
+                  allocations: plan.allocations,
+                  unmetDemands: plan.unmetDemands,
+                  governanceChecks,
+                };
+              })()
+            : null;
 
-      respond(
-        true,
-        {
-          ts: Date.now(),
-          summary: {
-            institutions: institutions.length,
-            activeInstitutions: institutions.filter(
-              (institution) => institution.status === "active",
-            ).length,
-            dormantInstitutions: institutions.filter(
-              (institution) => institution.status === "dormant",
-            ).length,
-            dissolvedInstitutions: institutions.filter(
-              (institution) => institution.status === "dissolved",
-            ).length,
+        respond(
+          true,
+          {
+            ts: Date.now(),
+            summary: {
+              institutions: institutions.length,
+              activeInstitutions: institutions.filter(
+                (institution) => institution.status === "active",
+              ).length,
+              dormantInstitutions: institutions.filter(
+                (institution) => institution.status === "dormant",
+              ).length,
+              dissolvedInstitutions: institutions.filter(
+                (institution) => institution.status === "dissolved",
+              ).length,
+            },
+            totalsByForm,
+            institutions,
+            allocationPreview,
           },
-          totalsByForm,
-          institutions,
-          allocationPreview,
-        },
-        undefined,
-      );
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
-    }
-  },
-};
+          undefined,
+        );
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+      }
+    },
+  };
+}
+
+export const prometheusHandlers: GatewayRequestHandlers = createPrometheusHandlers();
 
 assertPrometheusHandlerContract({
   handlers: prometheusHandlers,

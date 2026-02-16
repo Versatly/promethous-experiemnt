@@ -11,6 +11,12 @@ import {
   PROMETHEUS_GATEWAY_READ_METHODS,
   PROMETHEUS_GATEWAY_WRITE_METHODS,
 } from "./prometheus-methods.js";
+import {
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
+  runPrometheusControlPreview,
+} from "./prometheus.control-preview.js";
+import { createPrometheusHandlers } from "./prometheus.js";
 
 const READ_METHODS = PROMETHEUS_GATEWAY_READ_METHODS;
 const WRITE_METHODS = PROMETHEUS_GATEWAY_WRITE_METHODS;
@@ -293,6 +299,57 @@ describe("PROMETHEUS gateway authorization", () => {
         resolvePrometheusPlannedMethodPreflight: () => undefined,
         resolvePrometheusPlannedMethodMetadata: () => metadata,
       },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
+
+  it("keeps planned-action UNAVAILABLE fallback at request handling when preflight resolver misses", async () => {
+    const action = "autarch.gap-detection.commit";
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action,
+      metadata,
+    });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-action-fallback-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action,
+          goalId: "goal-1",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: (params, deps) =>
+          runPrometheusControlPreview(params, {
+            ...deps,
+            resolvePlannedActionPreflight: () => undefined,
+            resolvePlannedActionMetadata: () => metadata,
+          }),
+      }),
     });
 
     expect(respond).toHaveBeenCalledWith(
