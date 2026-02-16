@@ -34,11 +34,6 @@ import { webHandlers } from "./server-methods/web.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
 import { formatForLog } from "./ws-log.js";
 
-export {
-  getPrometheusMutatingControlGuardError,
-  getPrometheusPlannedMutatingMethodGuardError,
-} from "./server-methods/prometheus.auth-guards.js";
-
 const ADMIN_SCOPE = "operator.admin";
 const READ_SCOPE = "operator.read";
 const WRITE_SCOPE = "operator.write";
