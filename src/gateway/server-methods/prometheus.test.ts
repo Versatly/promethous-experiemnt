@@ -7,6 +7,7 @@ import {
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
 } from "../../prometheus/index.js";
+import { handleGatewayRequest } from "../server-methods.js";
 import { prometheusHandlers } from "./prometheus.js";
 
 const cleanupDirs = new Set<string>();
@@ -99,6 +100,50 @@ describe("prometheusHandlers.prometheus.status", () => {
         ],
       }),
       undefined,
+    );
+  });
+});
+
+describe("prometheus.status gateway authorization", () => {
+  it("allows operator.read scope", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: { type: "req", id: "read-1", method: "prometheus.status", params: {} },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(true, expect.any(Object), undefined);
+  });
+
+  it("rejects calls without read or write scope", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: { type: "req", id: "read-2", method: "prometheus.status", params: {} },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: [],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("operator.read"),
+      }),
     );
   });
 });
