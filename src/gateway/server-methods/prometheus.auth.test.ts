@@ -11,6 +11,7 @@ import {
   PROMETHEUS_GATEWAY_READ_METHODS,
   PROMETHEUS_GATEWAY_WRITE_METHODS,
 } from "./prometheus-methods.js";
+import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
@@ -617,6 +618,102 @@ describe("PROMETHEUS gateway authorization", () => {
       expect.objectContaining({
         code: "UNAVAILABLE",
         message: expect.stringContaining("auth override dependency exploded"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected catalog dependency violates summary invariants at request level", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "catalog-summary-invariant-request-level",
+        method: "prometheus.control.catalog",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        buildControlCatalogSnapshot: () => {
+          const snapshot = buildPrometheusControlCatalogSnapshot();
+          return {
+            ...snapshot,
+            summary: {
+              ...snapshot.summary,
+              writeMethods: snapshot.summary.writeMethods + 1,
+            },
+          } as never;
+        },
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected preview dependency violates bounded AUTARCH invariants at request level", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "preview-autarch-bounds-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: async () =>
+          ({
+            ok: true,
+            payload: {
+              ts: Date.now(),
+              action: "autarch.gap-detection",
+              mutatesState: false,
+              preview: {
+                suggestedGapCount: 2,
+                suggestions: [
+                  {
+                    suggestionId: "gap-1",
+                    goalId: "goal-1",
+                    severity: "high",
+                    description: "First",
+                  },
+                ],
+              },
+            },
+          }) as never,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("Invalid control preview result shape"),
       }),
     );
   });
