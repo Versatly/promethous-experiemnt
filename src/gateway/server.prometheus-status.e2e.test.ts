@@ -572,4 +572,32 @@ describe("gateway prometheus.status", () => {
     expect(response.error?.message).toContain("unauthorized role: node");
     ws.close();
   });
+
+  it("allows operator.write scope for prometheus.status", async () => {
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-write-allow",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-write-allow",
+        method: "prometheus.status",
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      payload?: { summary?: { goals?: number } };
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.summary?.goals).toBeGreaterThanOrEqual(0);
+    expect(response.error).toBeUndefined();
+    ws.close();
+  });
 });

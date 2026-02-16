@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
+import { listGatewayMethods } from "../server-methods-list.js";
 import { handleGatewayRequest } from "../server-methods.js";
 
 const READ_METHODS = [
@@ -12,6 +13,13 @@ const READ_METHODS = [
 ] as const;
 
 describe("PROMETHEUS gateway authorization", () => {
+  it("covers every prometheus.* method exposed in gateway method list", () => {
+    const prometheusMethods = listGatewayMethods()
+      .filter((method) => method.startsWith("prometheus."))
+      .toSorted();
+    expect(prometheusMethods).toEqual([...READ_METHODS].toSorted());
+  });
+
   it.each(READ_METHODS)("allows operator.read scope for %s", async (method) => {
     const respond = vi.fn();
     await handleGatewayRequest({
