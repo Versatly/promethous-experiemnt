@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { listGatewayMethods } from "../server-methods-list.js";
 import { handleGatewayRequest } from "../server-methods.js";
 import {
   PROMETHEUS_GATEWAY_METHODS,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
   PROMETHEUS_GATEWAY_READ_METHODS,
   PROMETHEUS_GATEWAY_WRITE_METHODS,
@@ -12,6 +13,10 @@ import {
 const READ_METHODS = PROMETHEUS_GATEWAY_READ_METHODS;
 const WRITE_METHODS = PROMETHEUS_GATEWAY_WRITE_METHODS;
 const ALL_METHODS = PROMETHEUS_GATEWAY_METHODS;
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("PROMETHEUS gateway authorization", () => {
   it("covers every prometheus.* method exposed in gateway method list", () => {
@@ -207,6 +212,41 @@ describe("PROMETHEUS gateway authorization", () => {
         expect.objectContaining({
           code: "UNAVAILABLE",
           message: expect.stringContaining(`planned mutating method "${method}" is disabled`),
+        }),
+      );
+    }
+  });
+
+  it("returns UNAVAILABLE not-implemented when planned methods are env-enabled", async () => {
+    vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
+    for (const method of Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA)) {
+      const respond = vi.fn();
+      await handleGatewayRequest({
+        req: {
+          type: "req",
+          id: `planned-enabled-${method}`,
+          method,
+          params: {},
+        },
+        client: {
+          connect: {
+            role: "operator",
+            scopes: ["operator.write"],
+          },
+        },
+        isWebchatConnect: () => false,
+        respond,
+        context: {} as GatewayRequestContext,
+      });
+
+      expect(respond).toHaveBeenCalledWith(
+        false,
+        undefined,
+        expect.objectContaining({
+          code: "UNAVAILABLE",
+          message: expect.stringContaining(
+            `planned mutating method "${method}" is not implemented yet`,
+          ),
         }),
       );
     }

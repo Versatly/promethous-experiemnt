@@ -101,6 +101,7 @@ These methods are intentionally scoped to telemetry and read models. They do not
 - `prometheus.control.catalog`:
   - `ts`
   - `summary`
+    - includes count fields for mutating and planned-mutating methods/actions
   - `guardrails`
     - includes `mutationsEnabled`, `mutatingMethods`, `plannedMutatingMethods`,
       `mutatingPreviewActions`, `plannedMutatingPreviewActions`

@@ -644,8 +644,10 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
           readMethods: expect.any(Number),
           writeMethods: expect.any(Number),
           mutatingMethods: 0,
+          plannedMutatingMethods: 3,
           previewActions: 3,
           mutatingPreviewActions: 0,
+          plannedMutatingPreviewActions: 3,
         }),
         guardrails: expect.objectContaining({
           mutationsEnabled: false,

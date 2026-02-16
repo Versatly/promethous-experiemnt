@@ -408,8 +408,10 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         readMethods: methods.filter((method) => method.access === "read").length,
         writeMethods: methods.filter((method) => method.access === "write").length,
         mutatingMethods: mutatingMethods.length,
+        plannedMutatingMethods: plannedMutatingMethods.length,
         previewActions: actions.length,
         mutatingPreviewActions: mutatingPreviewActions.length,
+        plannedMutatingPreviewActions: plannedMutatingPreviewActions.length,
       };
       respond(
         true,

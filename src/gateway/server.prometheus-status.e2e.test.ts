@@ -687,8 +687,10 @@ describe("gateway prometheus.status", () => {
           readMethods?: number;
           writeMethods?: number;
           mutatingMethods?: number;
+          plannedMutatingMethods?: number;
           previewActions?: number;
           mutatingPreviewActions?: number;
+          plannedMutatingPreviewActions?: number;
         };
         guardrails?: {
           mutationsEnabled?: boolean;
@@ -759,8 +761,10 @@ describe("gateway prometheus.status", () => {
         readMethods: expect.any(Number),
         writeMethods: expect.any(Number),
         mutatingMethods: 0,
+        plannedMutatingMethods: 3,
         previewActions: 3,
         mutatingPreviewActions: 0,
+        plannedMutatingPreviewActions: 3,
       }),
     );
     expect(response.payload?.guardrails).toEqual(
