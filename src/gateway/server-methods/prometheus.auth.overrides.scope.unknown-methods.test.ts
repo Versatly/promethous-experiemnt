@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   runPrometheusNodeRequest,
   runPrometheusOperatorRequest,
+  runPrometheusRoleRequest,
 } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
@@ -177,6 +178,52 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       undefined,
       expect.objectContaining({
         message: expect.stringContaining("unauthorized role: node"),
+      }),
+    );
+    expect(unknownMethodHandler).not.toHaveBeenCalled();
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch injected unknown handlers when non-operator role is denied", async () => {
+    const method = "prometheus.unknown.gateway.method";
+    const unknownMethodHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not run for non-operator unknown method");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not run for non-operator unknown method");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not run for non-operator unknown method");
+    });
+    const respond = vi.fn();
+    await runPrometheusRoleRequest({
+      role: "auditor",
+      request: {
+        id: "unknown-prometheus-method-non-operator-denied-before-handler-dispatch",
+        method,
+        params: {},
+      },
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+      extraHandlers: {
+        [method]: unknownMethodHandler,
+      },
+      respond,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: auditor"),
       }),
     );
     expect(unknownMethodHandler).not.toHaveBeenCalled();
