@@ -643,6 +643,12 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
           previewActions: 3,
           mutatingPreviewActions: 0,
         }),
+        guardrails: expect.objectContaining({
+          mutationsEnabled: false,
+          enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+          mutatingMethods: [],
+          mutatingPreviewActions: [],
+        }),
         methods: expect.arrayContaining([
           expect.objectContaining({
             method: "prometheus.control.catalog",

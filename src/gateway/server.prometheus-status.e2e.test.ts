@@ -690,6 +690,12 @@ describe("gateway prometheus.status", () => {
           previewActions?: number;
           mutatingPreviewActions?: number;
         };
+        guardrails?: {
+          mutationsEnabled?: boolean;
+          enableEnvVar?: string;
+          mutatingMethods?: string[];
+          mutatingPreviewActions?: string[];
+        };
         methods?: Array<{ method?: string; access?: string; mutatesState?: boolean }>;
         controlPreview?: {
           method?: string;
@@ -741,6 +747,14 @@ describe("gateway prometheus.status", () => {
         mutatingMethods: 0,
         previewActions: 3,
         mutatingPreviewActions: 0,
+      }),
+    );
+    expect(response.payload?.guardrails).toEqual(
+      expect.objectContaining({
+        mutationsEnabled: false,
+        enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+        mutatingMethods: [],
+        mutatingPreviewActions: [],
       }),
     );
     expect(response.error).toBeUndefined();

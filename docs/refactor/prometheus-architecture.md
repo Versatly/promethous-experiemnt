@@ -101,6 +101,7 @@ These methods are intentionally scoped to telemetry and read models. They do not
 - `prometheus.control.catalog`:
   - `ts`
   - `summary`
+  - `guardrails`
   - `methods`
   - `controlPreview`
 - `prometheus.goals`:
@@ -162,7 +163,6 @@ caught before cutover.
 
 PROMETHEUS adapters are split between read telemetry and control preview surfaces:
 
-- Read telemetry adapters (`status`, `trajectory`, `goals`, `recursion`, `autarch`, `monolith`):
 - Read telemetry adapters (`status`, `control.catalog`, `trajectory`, `goals`, `recursion`, `autarch`, `monolith`):
   - allowed for `operator.read`, `operator.write`, and `operator.admin`
   - rejected when read scope is missing.
@@ -178,6 +178,9 @@ Method-level access and mutability metadata is centralized in gateway code
 can be asserted in tests as new control methods are introduced.
 Handler coverage is fail-fast checked at module load (`assertPrometheusHandlerContract`) so
 metadata and implemented `prometheus.*` handlers cannot silently drift.
+Future mutating control methods are additionally gated by
+`OPENCLAW_PROMETHEUS_MUTATING_CONTROLS=1`; `prometheus.control.catalog` exposes this guardrail
+state and lists any currently mutating methods/actions.
 
 ## Scope boundaries
 

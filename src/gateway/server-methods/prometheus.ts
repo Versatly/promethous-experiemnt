@@ -13,10 +13,14 @@ import {
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
 import {
+  arePrometheusMutatingControlsEnabled,
+  listPrometheusMutatingMethods,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   type PrometheusGatewayMethodMetadata,
 } from "./prometheus-methods.js";
 import {
+  listPrometheusMutatingPreviewActions,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
   runPrometheusControlPreview,
@@ -390,19 +394,28 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         action,
         ...PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action],
       }));
+      const mutatingMethods = listPrometheusMutatingMethods();
+      const mutatingPreviewActions = listPrometheusMutatingPreviewActions();
+      const mutationsEnabled = arePrometheusMutatingControlsEnabled();
       const summary = {
         totalMethods: methods.length,
         readMethods: methods.filter((method) => method.access === "read").length,
         writeMethods: methods.filter((method) => method.access === "write").length,
-        mutatingMethods: methods.filter((method) => method.mutatesState).length,
+        mutatingMethods: mutatingMethods.length,
         previewActions: actions.length,
-        mutatingPreviewActions: actions.filter((action) => action.mutatesState).length,
+        mutatingPreviewActions: mutatingPreviewActions.length,
       };
       respond(
         true,
         {
           ts: Date.now(),
           summary,
+          guardrails: {
+            mutationsEnabled,
+            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+            mutatingMethods,
+            mutatingPreviewActions,
+          },
           methods,
           controlPreview: {
             method: "prometheus.control.preview",

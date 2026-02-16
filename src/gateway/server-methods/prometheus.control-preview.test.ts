@@ -9,6 +9,7 @@ import {
 import { ErrorCodes } from "../protocol/index.js";
 import {
   assertPrometheusControlPreviewActionContract,
+  listPrometheusMutatingPreviewActions,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   isPrometheusControlPreviewAction,
@@ -56,6 +57,7 @@ describe("prometheus control preview helpers", () => {
     expect(
       PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA["recursion.mutation-evaluation"].requiredParams,
     ).toEqual(["proposal", "baseline", "candidate"]);
+    expect(listPrometheusMutatingPreviewActions()).toEqual([]);
   });
 
   it("returns INVALID_REQUEST for missing or unsupported actions", async () => {
@@ -271,5 +273,20 @@ describe("prometheus control preview helpers", () => {
         },
       }),
     ).toThrow("action list and metadata keys diverged");
+  });
+
+  it("reports mutating preview actions from metadata", () => {
+    expect(
+      listPrometheusMutatingPreviewActions({
+        "autarch.gap-detection": {
+          mutatesState: false,
+          requiredParams: [],
+        },
+        "prometheus.control.execute": {
+          mutatesState: true,
+          requiredParams: ["dryRun"],
+        },
+      }),
+    ).toEqual(["prometheus.control.execute"]);
   });
 });

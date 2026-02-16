@@ -14,7 +14,12 @@ import { healthHandlers } from "./server-methods/health.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
-import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./server-methods/prometheus-methods.js";
+import {
+  arePrometheusMutatingControlsEnabled,
+  getPrometheusGatewayMethodMetadata,
+  PROMETHEUS_GATEWAY_METHOD_METADATA,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
+} from "./server-methods/prometheus-methods.js";
 import { prometheusHandlers } from "./server-methods/prometheus.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
@@ -123,6 +128,13 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   }
   if (role !== "operator") {
     return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${role}`);
+  }
+  const prometheusMethodMetadata = getPrometheusGatewayMethodMetadata(method);
+  if (prometheusMethodMetadata?.mutatesState === true && !arePrometheusMutatingControlsEnabled()) {
+    return errorShape(
+      ErrorCodes.UNAVAILABLE,
+      `prometheus mutating controls are disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable)`,
+    );
   }
   if (scopes.includes(ADMIN_SCOPE)) {
     return null;

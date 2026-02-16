@@ -28,6 +28,8 @@ export type PrometheusGatewayMethodMetadata = {
   mutatesState: boolean;
 };
 
+export const PROMETHEUS_MUTATING_CONTROLS_ENV = "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS";
+
 export const PROMETHEUS_GATEWAY_METHOD_METADATA: Record<
   PrometheusGatewayMethod,
   PrometheusGatewayMethodMetadata
@@ -65,6 +67,33 @@ export const PROMETHEUS_GATEWAY_METHOD_METADATA: Record<
     mutatesState: false,
   },
 };
+
+export function listPrometheusMutatingMethods(
+  methodMetadata: Record<
+    string,
+    PrometheusGatewayMethodMetadata
+  > = PROMETHEUS_GATEWAY_METHOD_METADATA,
+): string[] {
+  return Object.entries(methodMetadata)
+    .filter(([, metadata]) => metadata.mutatesState)
+    .map(([method]) => method)
+    .toSorted();
+}
+
+export function arePrometheusMutatingControlsEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env[PROMETHEUS_MUTATING_CONTROLS_ENV] === "1";
+}
+
+export function getPrometheusGatewayMethodMetadata(
+  method: string,
+): PrometheusGatewayMethodMetadata | undefined {
+  if (!(method in PROMETHEUS_GATEWAY_METHOD_METADATA)) {
+    return undefined;
+  }
+  return PROMETHEUS_GATEWAY_METHOD_METADATA[method as PrometheusGatewayMethod];
+}
 
 export function assertPrometheusGatewayMethodMetadataContract(args: {
   readMethods: readonly string[];

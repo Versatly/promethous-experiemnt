@@ -44,6 +44,18 @@ export const PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA = {
   },
 } as const satisfies Record<PrometheusControlPreviewAction, PrometheusControlPreviewActionMetadata>;
 
+export function listPrometheusMutatingPreviewActions(
+  actionMetadata: Record<
+    string,
+    PrometheusControlPreviewActionMetadata
+  > = PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+): string[] {
+  return Object.entries(actionMetadata)
+    .filter(([, metadata]) => metadata.mutatesState)
+    .map(([action]) => action)
+    .toSorted();
+}
+
 export function assertPrometheusControlPreviewActionContract(args: {
   actions: readonly string[];
   actionMetadata: Record<string, PrometheusControlPreviewActionMetadata>;

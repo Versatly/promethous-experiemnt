@@ -239,6 +239,12 @@ describe("prometheus adapter summary consistency", () => {
         previewActions: number;
         mutatingPreviewActions: number;
       };
+      guardrails: {
+        mutationsEnabled: boolean;
+        enableEnvVar: string;
+        mutatingMethods: string[];
+        mutatingPreviewActions: string[];
+      };
       methods: Array<{ method: string; access: string; mutatesState: boolean }>;
       controlPreview: {
         method: string;
@@ -270,6 +276,20 @@ describe("prometheus adapter summary consistency", () => {
     expect(payload.summary.mutatingPreviewActions).toBe(
       payload.controlPreview.actions.filter((action) => action.mutatesState).length,
     );
+    expect(payload.guardrails.enableEnvVar).toBe("OPENCLAW_PROMETHEUS_MUTATING_CONTROLS");
+    expect(payload.guardrails.mutatingMethods).toEqual(
+      payload.methods
+        .filter((method) => method.mutatesState)
+        .map((method) => method.method)
+        .toSorted(),
+    );
+    expect(payload.guardrails.mutatingPreviewActions).toEqual(
+      payload.controlPreview.actions
+        .filter((action) => action.mutatesState)
+        .map((action) => action.action)
+        .toSorted(),
+    );
+    expect(payload.guardrails.mutationsEnabled).toBe(false);
 
     for (const action of PROMETHEUS_CONTROL_PREVIEW_ACTIONS) {
       expect(payload.controlPreview.actions).toContainEqual(

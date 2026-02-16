@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  arePrometheusMutatingControlsEnabled,
   assertPrometheusGatewayMethodMetadataContract,
+  listPrometheusMutatingMethods,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_GATEWAY_METHODS,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_GATEWAY_READ_METHODS,
@@ -68,5 +71,31 @@ describe("PROMETHEUS method access map", () => {
         },
       }),
     ).toThrow("methods and metadata keys diverged");
+  });
+
+  it("reports mutating methods from metadata and keeps current list empty", () => {
+    expect(listPrometheusMutatingMethods()).toEqual([]);
+    expect(
+      listPrometheusMutatingMethods({
+        "prometheus.status": {
+          access: "read",
+          mutatesState: false,
+        },
+        "prometheus.control.execute": {
+          access: "write",
+          mutatesState: true,
+        },
+      }),
+    ).toEqual(["prometheus.control.execute"]);
+  });
+
+  it("only enables mutating controls when env var is set to 1", () => {
+    expect(arePrometheusMutatingControlsEnabled({})).toBe(false);
+    expect(arePrometheusMutatingControlsEnabled({ [PROMETHEUS_MUTATING_CONTROLS_ENV]: "0" })).toBe(
+      false,
+    );
+    expect(arePrometheusMutatingControlsEnabled({ [PROMETHEUS_MUTATING_CONTROLS_ENV]: "1" })).toBe(
+      true,
+    );
   });
 });
