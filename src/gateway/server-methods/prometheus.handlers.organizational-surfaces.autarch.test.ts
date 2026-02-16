@@ -1,8 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
@@ -66,16 +65,14 @@ describe("prometheusHandlers.prometheus.autarch", () => {
     ]);
 
     const respond = vi.fn();
-    await prometheusHandlers["prometheus.autarch"]({
-      req: { type: "req", id: "autarch-1", method: "prometheus.autarch" },
+    await runPrometheusHandler({
+      method: "prometheus.autarch",
+      requestId: "autarch-1",
       params: {
         stateDir,
         severity: "critical",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

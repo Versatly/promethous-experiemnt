@@ -9,16 +9,20 @@ type PrometheusHandlerRequestArgs = {
   context?: GatewayRequestContext;
 };
 
+type PrometheusGenericHandlerRequestArgs = PrometheusHandlerRequestArgs & {
+  method: keyof GatewayRequestHandlers;
+};
+
 function resolvePrometheusHandlers(handlers?: GatewayRequestHandlers): GatewayRequestHandlers {
   return handlers ?? prometheusHandlers;
 }
 
-export async function runPrometheusControlCatalogHandler(args: PrometheusHandlerRequestArgs) {
-  await resolvePrometheusHandlers(args.handlers)["prometheus.control.catalog"]({
+export async function runPrometheusHandler(args: PrometheusGenericHandlerRequestArgs) {
+  await resolvePrometheusHandlers(args.handlers)[args.method]({
     req: {
       type: "req",
       id: args.requestId,
-      method: "prometheus.control.catalog",
+      method: args.method,
     },
     params: args.params ?? {},
     client: null,
@@ -28,17 +32,16 @@ export async function runPrometheusControlCatalogHandler(args: PrometheusHandler
   });
 }
 
+export async function runPrometheusControlCatalogHandler(args: PrometheusHandlerRequestArgs) {
+  await runPrometheusHandler({
+    ...args,
+    method: "prometheus.control.catalog",
+  });
+}
+
 export async function runPrometheusControlPreviewHandler(args: PrometheusHandlerRequestArgs) {
-  await resolvePrometheusHandlers(args.handlers)["prometheus.control.preview"]({
-    req: {
-      type: "req",
-      id: args.requestId,
-      method: "prometheus.control.preview",
-    },
-    params: args.params ?? {},
-    client: null,
-    isWebchatConnect: () => false,
-    respond: args.respond,
-    context: args.context ?? ({} as GatewayRequestContext),
+  await runPrometheusHandler({
+    ...args,
+    method: "prometheus.control.preview",
   });
 }

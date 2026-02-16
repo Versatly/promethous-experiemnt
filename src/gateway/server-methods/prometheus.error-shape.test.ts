@@ -1,10 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
@@ -21,7 +20,7 @@ describe("prometheus handler error shape parity", () => {
     await fs.writeFile(eventLogPath, "{", "utf8");
 
     const methods: Array<{
-      method: keyof typeof prometheusHandlers;
+      method: Parameters<typeof runPrometheusHandler>[0]["method"];
       params: Record<string, unknown>;
     }> = [
       { method: "prometheus.status", params: { stateDir } },
@@ -39,13 +38,11 @@ describe("prometheus handler error shape parity", () => {
     const codes: string[] = [];
     for (const method of methods) {
       const respond = vi.fn();
-      await prometheusHandlers[method.method]({
-        req: { type: "req", id: method.method, method: method.method },
+      await runPrometheusHandler({
+        method: method.method,
+        requestId: method.method,
         params: method.params,
-        client: null,
-        isWebchatConnect: () => false,
         respond,
-        context: {} as GatewayRequestContext,
       });
       const call = respond.mock.calls[0] as [boolean, unknown, { code?: string; message?: string }];
       expect(call[0]).toBe(false);
@@ -75,13 +72,11 @@ describe("prometheus handler error shape parity", () => {
     });
 
     const missingGoalRespond = vi.fn();
-    await prometheusHandlers["prometheus.trajectory"]({
-      req: { type: "req", id: "missing-goal", method: "prometheus.trajectory" },
+    await runPrometheusHandler({
+      method: "prometheus.trajectory",
+      requestId: "missing-goal",
       params: { stateDir },
-      client: null,
-      isWebchatConnect: () => false,
       respond: missingGoalRespond,
-      context: {} as GatewayRequestContext,
     });
     expect(missingGoalRespond).toHaveBeenCalledWith(
       false,
@@ -90,13 +85,11 @@ describe("prometheus handler error shape parity", () => {
     );
 
     const unknownGoalRespond = vi.fn();
-    await prometheusHandlers["prometheus.trajectory"]({
-      req: { type: "req", id: "unknown-goal", method: "prometheus.trajectory" },
+    await runPrometheusHandler({
+      method: "prometheus.trajectory",
+      requestId: "unknown-goal",
       params: { stateDir, goalId: "missing-goal" },
-      client: null,
-      isWebchatConnect: () => false,
       respond: unknownGoalRespond,
-      context: {} as GatewayRequestContext,
     });
     expect(unknownGoalRespond).toHaveBeenCalledWith(
       false,

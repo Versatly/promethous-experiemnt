@@ -3,10 +3,28 @@ import { ErrorCodes } from "../protocol/index.js";
 import {
   runPrometheusControlCatalogHandler,
   runPrometheusControlPreviewHandler,
+  runPrometheusHandler,
 } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
 describe("prometheus handler test helpers", () => {
+  it("runs generic helper for non-control prometheus handlers", async () => {
+    const respond = vi.fn();
+    await runPrometheusHandler({
+      method: "prometheus.status",
+      requestId: "handler-helper-generic-status",
+      respond,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        summary: expect.any(Object),
+      }),
+      undefined,
+    );
+  });
+
   it("runs control catalog handler with default prometheus handlers", async () => {
     const respond = vi.fn();
     await runPrometheusControlCatalogHandler({

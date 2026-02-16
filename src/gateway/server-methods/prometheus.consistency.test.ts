@@ -2,7 +2,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
-import { prometheusHandlers } from "./prometheus.js";
+import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
@@ -134,11 +134,10 @@ describe("prometheus adapter summary consistency", () => {
     const context = {} as GatewayRequestContext;
 
     const statusRespond = vi.fn();
-    await prometheusHandlers["prometheus.status"]({
-      req: { type: "req", id: "status", method: "prometheus.status" },
+    await runPrometheusHandler({
+      method: "prometheus.status",
+      requestId: "status",
       params: { stateDir },
-      client: null,
-      isWebchatConnect: () => false,
       respond: statusRespond,
       context,
     });
@@ -153,11 +152,10 @@ describe("prometheus adapter summary consistency", () => {
     };
 
     const autarchRespond = vi.fn();
-    await prometheusHandlers["prometheus.autarch"]({
-      req: { type: "req", id: "autarch", method: "prometheus.autarch" },
+    await runPrometheusHandler({
+      method: "prometheus.autarch",
+      requestId: "autarch",
       params: { stateDir },
-      client: null,
-      isWebchatConnect: () => false,
       respond: autarchRespond,
       context,
     });
@@ -170,11 +168,10 @@ describe("prometheus adapter summary consistency", () => {
     };
 
     const monolithRespond = vi.fn();
-    await prometheusHandlers["prometheus.monolith"]({
-      req: { type: "req", id: "monolith", method: "prometheus.monolith" },
+    await runPrometheusHandler({
+      method: "prometheus.monolith",
+      requestId: "monolith",
       params: { stateDir },
-      client: null,
-      isWebchatConnect: () => false,
       respond: monolithRespond,
       context,
     });
