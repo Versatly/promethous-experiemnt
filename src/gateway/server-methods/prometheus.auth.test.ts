@@ -532,6 +532,60 @@ describe("PROMETHEUS gateway authorization", () => {
     );
   });
 
+  it("keeps planned-action canonical preflight at request handling when resolver returns divergent valid preflight", async () => {
+    const action = "autarch.gap-detection.commit";
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action,
+      metadata,
+    });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-action-divergent-preflight-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action,
+          goalId: "goal-1",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: (params, deps) =>
+          runPrometheusControlPreview(params, {
+            ...deps,
+            resolvePlannedActionPreflight: () => ({
+              disabledMessage: "DIVERGENT disabled message",
+              notImplementedMessage: "DIVERGENT not implemented message",
+              requiredParamsMessage: "DIVERGENT required params message",
+            }),
+          }),
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
+
   it("returns UNAVAILABLE when injected auth override resolver throws", async () => {
     const respond = vi.fn();
     await handleGatewayRequest({
