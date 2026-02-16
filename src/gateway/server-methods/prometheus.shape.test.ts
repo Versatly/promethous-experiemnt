@@ -1,12 +1,13 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
-import {
-  createFileHeliosTrajectoryStore,
-  createFilePrometheusEventStore,
-} from "../../prometheus/index.js";
+import { runPrometheusHandler } from "./prometheus.handler-test-helpers.js";
 import { prometheusHandlers } from "./prometheus.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import { createGoalCreatedEvent } from "./prometheus.test-events.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+  createPrometheusTrajectoryStoreForStateDir,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -15,24 +16,16 @@ afterEach(async () => {
 });
 
 async function seedPrometheusState(stateDir: string) {
-  const eventStore = createFilePrometheusEventStore(
-    path.join(stateDir, "prometheus", "events.jsonl"),
-  );
-  const trajectoryStore = createFileHeliosTrajectoryStore(
-    path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
-  );
+  const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+  const trajectoryStore = createPrometheusTrajectoryStoreForStateDir(stateDir);
   await eventStore.appendBatch([
-    {
+    createGoalCreatedEvent({
       id: "evt-goal-root",
-      type: "goal.created",
       occurredAt: 1,
-      payload: {
-        goalId: "goal-root",
-        title: "Root objective",
-        objective: "Ship recursive system",
-        priority: 100,
-      },
-    },
+      goalId: "goal-root",
+      title: "Root objective",
+      objective: "Ship recursive system",
+    }),
     {
       id: "evt-goal-status",
       type: "goal.status-updated",
@@ -107,11 +100,10 @@ describe("prometheus handlers response shape", () => {
       params: Record<string, unknown>,
     ) => {
       const respond = vi.fn();
-      await prometheusHandlers[method]({
-        req: { type: "req", id: method, method },
+      await runPrometheusHandler({
+        method,
+        requestId: method,
         params,
-        client: null,
-        isWebchatConnect: () => false,
         respond,
         context,
       });
