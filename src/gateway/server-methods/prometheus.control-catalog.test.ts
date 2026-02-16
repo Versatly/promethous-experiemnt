@@ -163,6 +163,31 @@ describe("prometheus control catalog builder", () => {
     );
   });
 
+  it("falls back when planned mutating method preflight lookup returns malformed entries", () => {
+    const plannedMethod = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted()[0]!;
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(plannedMethod);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedMethodPreflight: () =>
+        ({
+          disabledMessage: 123,
+        }) as never,
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.find((method) => method.method === plannedMethod)
+        ?.preflight,
+    ).toEqual(
+      buildPrometheusPlannedMutatingMethodPreflight({
+        method: plannedMethod,
+        metadata,
+      }),
+    );
+  });
+
   it("fails fast when planned mutating action metadata lookup misses known entries", () => {
     const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
       .toSorted()
@@ -198,5 +223,52 @@ describe("prometheus control catalog builder", () => {
         metadata,
       }),
     );
+  });
+
+  it("falls back when planned mutating action preflight lookup returns malformed entries", () => {
+    const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
+      .toSorted()
+      .at(0)!;
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(plannedAction);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedActionPreflight: () =>
+        ({
+          notImplementedMessage: 123,
+        }) as never,
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.find(
+        (action) => action.action === plannedAction,
+      )?.preflight,
+    ).toEqual(
+      buildPrometheusPlannedMutatingPreviewActionPreflight({
+        action: plannedAction,
+        metadata,
+      }),
+    );
+  });
+
+  it("fails fast when planned mutating action metadata resolver returns malformed object", () => {
+    const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
+      .toSorted()
+      .at(0)!;
+    expect(() =>
+      buildPrometheusControlCatalogSnapshot({
+        env: {},
+        resolvePlannedActionMetadata: () =>
+          ({
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+            requiredParams: ["goalId", "goalId"],
+            reason: "invalid required params",
+          }) as never,
+      }),
+    ).toThrow(`Missing planned mutating action metadata for "${plannedAction}"`);
   });
 });

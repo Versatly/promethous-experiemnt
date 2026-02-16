@@ -293,6 +293,41 @@ export type PrometheusControlPreviewDeps = {
   ) => PrometheusPlannedMutatingPreviewActionMetadata | undefined;
 };
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isPrometheusPlannedMutatingPreviewActionMetadataShape(
+  value: unknown,
+): value is PrometheusPlannedMutatingPreviewActionMetadata {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<PrometheusPlannedMutatingPreviewActionMetadata>;
+  return (
+    candidate.mutatesState === true &&
+    candidate.enabled === false &&
+    typeof candidate.enableEnvVar === "string" &&
+    isStringArray(candidate.requiredParams) &&
+    !hasPrometheusInvalidRequiredParams(candidate.requiredParams) &&
+    typeof candidate.reason === "string"
+  );
+}
+
+function isPrometheusPlannedMutatingPreviewActionPreflightShape(
+  value: unknown,
+): value is PrometheusPlannedMutatingPreviewActionPreflight {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<PrometheusPlannedMutatingPreviewActionPreflight>;
+  return (
+    typeof candidate.disabledMessage === "string" &&
+    typeof candidate.notImplementedMessage === "string" &&
+    typeof candidate.requiredParamsMessage === "string"
+  );
+}
+
 function isMutationFitnessSnapshotInput(value: unknown): value is MutationFitnessSnapshotInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -359,10 +394,20 @@ export async function runPrometheusControlPreview(
   deps?: PrometheusControlPreviewDeps,
 ): Promise<PrometheusControlPreviewResult> {
   try {
-    const resolvePlannedActionPreflight =
+    const resolvePlannedActionPreflightRaw =
       deps?.resolvePlannedActionPreflight ?? getPrometheusPlannedMutatingPreviewActionPreflight;
-    const resolvePlannedActionMetadata =
+    const resolvePlannedActionMetadataRaw =
       deps?.resolvePlannedActionMetadata ?? getPrometheusPlannedMutatingPreviewActionMetadata;
+    const resolvePlannedActionPreflight = (action: string) => {
+      const preflight = resolvePlannedActionPreflightRaw(action);
+      return isPrometheusPlannedMutatingPreviewActionPreflightShape(preflight)
+        ? preflight
+        : undefined;
+    };
+    const resolvePlannedActionMetadata = (action: string) => {
+      const metadata = resolvePlannedActionMetadataRaw(action);
+      return isPrometheusPlannedMutatingPreviewActionMetadataShape(metadata) ? metadata : undefined;
+    };
     const rawAction =
       typeof params.action === "string" && params.action.trim().length > 0
         ? params.action.trim()

@@ -406,6 +406,73 @@ describe("prometheus control preview helpers", () => {
     });
   });
 
+  it("falls back to metadata when planned-action preflight resolver returns malformed object", async () => {
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const fallbackPreflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action: "autarch.gap-detection.commit",
+      metadata,
+    });
+    const result = await runPrometheusControlPreview(
+      {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-1",
+      },
+      {
+        resolvePlannedActionPreflight: () =>
+          ({
+            disabledMessage: 123,
+          }) as never,
+        resolvePlannedActionMetadata: () => metadata,
+      },
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: fallbackPreflight.disabledMessage,
+      },
+    });
+  });
+
+  it("returns UNAVAILABLE when planned-action metadata resolver returns malformed object", async () => {
+    const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(
+      "autarch.gap-detection.commit",
+    );
+    expect(preflight).toBeDefined();
+    if (!preflight) {
+      return;
+    }
+    const result = await runPrometheusControlPreview(
+      {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-1",
+      },
+      {
+        resolvePlannedActionMetadata: () =>
+          ({
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+            requiredParams: ["goalId", "goalId"],
+            reason: "invalid required params",
+          }) as never,
+      },
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: preflight.disabledMessage,
+      },
+    });
+  });
+
   it("fails fast when action metadata diverges from action list", () => {
     expect(() =>
       assertPrometheusControlPreviewActionContract({
