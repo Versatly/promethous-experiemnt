@@ -13,6 +13,8 @@ import {
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
 import {
+  getPrometheusPlannedMutatingMethodMetadata,
+  getPrometheusPlannedMutatingMethodPreflight,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   type PrometheusGatewayMethodMetadata,
 } from "./prometheus-methods.js";
@@ -22,6 +24,8 @@ import {
 } from "./prometheus.control-catalog.js";
 import {
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
+  getPrometheusPlannedMutatingPreviewActionPreflight,
   isPrometheusControlPreviewAction,
   runPrometheusControlPreview,
   type PrometheusControlPreviewResult,
@@ -82,6 +86,25 @@ function isPrometheusPlannedPreflightShape(value: unknown): value is {
     typeof candidate.disabledMessage === "string" &&
     typeof candidate.notImplementedMessage === "string" &&
     typeof candidate.requiredParamsMessage === "string"
+  );
+}
+
+function isPrometheusPlannedPreflightEquivalent(
+  left: {
+    disabledMessage: string;
+    notImplementedMessage: string;
+    requiredParamsMessage: string;
+  },
+  right: {
+    disabledMessage: string;
+    notImplementedMessage: string;
+    requiredParamsMessage: string;
+  },
+): boolean {
+  return (
+    left.disabledMessage === right.disabledMessage &&
+    left.notImplementedMessage === right.notImplementedMessage &&
+    left.requiredParamsMessage === right.requiredParamsMessage
   );
 }
 
@@ -160,15 +183,35 @@ function isPrometheusCatalogPlannedMethodEntry(value: unknown): value is {
     reason?: unknown;
     preflight?: unknown;
   };
+  if (typeof candidate.method !== "string") {
+    return false;
+  }
+  const expectedMetadata = getPrometheusPlannedMutatingMethodMetadata(candidate.method);
+  if (!expectedMetadata) {
+    return false;
+  }
+  const expectedPreflight = getPrometheusPlannedMutatingMethodPreflight(candidate.method);
+  if (!expectedPreflight) {
+    return false;
+  }
   return (
-    typeof candidate.method === "string" &&
     typeof candidate.access === "string" &&
     typeof candidate.mutatesState === "boolean" &&
     typeof candidate.enabled === "boolean" &&
     typeof candidate.enableEnvVar === "string" &&
     isStringArray(candidate.requiredParams) &&
     typeof candidate.reason === "string" &&
-    isPrometheusPlannedPreflightShape(candidate.preflight)
+    candidate.access === expectedMetadata.access &&
+    candidate.mutatesState === expectedMetadata.mutatesState &&
+    candidate.enabled === expectedMetadata.enabled &&
+    candidate.enableEnvVar === expectedMetadata.enableEnvVar &&
+    candidate.reason === expectedMetadata.reason &&
+    candidate.requiredParams.length === expectedMetadata.requiredParams.length &&
+    candidate.requiredParams.every(
+      (requiredParam, index) => requiredParam === expectedMetadata.requiredParams[index],
+    ) &&
+    isPrometheusPlannedPreflightShape(candidate.preflight) &&
+    isPrometheusPlannedPreflightEquivalent(candidate.preflight, expectedPreflight)
   );
 }
 
@@ -197,14 +240,33 @@ function isPrometheusCatalogPlannedActionEntry(value: unknown): value is {
     reason?: unknown;
     preflight?: unknown;
   };
+  if (typeof candidate.action !== "string") {
+    return false;
+  }
+  const expectedMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(candidate.action);
+  if (!expectedMetadata) {
+    return false;
+  }
+  const expectedPreflight = getPrometheusPlannedMutatingPreviewActionPreflight(candidate.action);
+  if (!expectedPreflight) {
+    return false;
+  }
   return (
-    typeof candidate.action === "string" &&
     typeof candidate.mutatesState === "boolean" &&
     typeof candidate.enabled === "boolean" &&
     typeof candidate.enableEnvVar === "string" &&
     isStringArray(candidate.requiredParams) &&
     typeof candidate.reason === "string" &&
-    isPrometheusPlannedPreflightShape(candidate.preflight)
+    candidate.mutatesState === expectedMetadata.mutatesState &&
+    candidate.enabled === expectedMetadata.enabled &&
+    candidate.enableEnvVar === expectedMetadata.enableEnvVar &&
+    candidate.reason === expectedMetadata.reason &&
+    candidate.requiredParams.length === expectedMetadata.requiredParams.length &&
+    candidate.requiredParams.every(
+      (requiredParam, index) => requiredParam === expectedMetadata.requiredParams[index],
+    ) &&
+    isPrometheusPlannedPreflightShape(candidate.preflight) &&
+    isPrometheusPlannedPreflightEquivalent(candidate.preflight, expectedPreflight)
   );
 }
 

@@ -900,6 +900,99 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected catalog snapshot planned-method metadata diverges from canonical contract", async () => {
+    const handlers = createPrometheusHandlers({
+      buildControlCatalogSnapshot: () => {
+        const snapshot = buildPrometheusControlCatalogSnapshot();
+        return {
+          ...snapshot,
+          guardrails: {
+            ...snapshot.guardrails,
+            plannedMutatingMethods: snapshot.guardrails.plannedMutatingMethods.map(
+              (method, index) =>
+                index === 0
+                  ? {
+                      ...method,
+                      reason: "DIVERGENT reason",
+                    }
+                  : method,
+            ),
+          },
+        } as never;
+      },
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.catalog"]({
+      req: {
+        type: "req",
+        id: "control-catalog-divergent-planned-method",
+        method: "prometheus.control.catalog",
+      },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected catalog snapshot planned-action preflight diverges from canonical contract", async () => {
+    const handlers = createPrometheusHandlers({
+      buildControlCatalogSnapshot: () => {
+        const snapshot = buildPrometheusControlCatalogSnapshot();
+        return {
+          ...snapshot,
+          guardrails: {
+            ...snapshot.guardrails,
+            plannedMutatingPreviewActions: snapshot.guardrails.plannedMutatingPreviewActions.map(
+              (action, index) =>
+                index === 0
+                  ? {
+                      ...action,
+                      preflight: {
+                        ...action.preflight,
+                        disabledMessage: "DIVERGENT disabled message",
+                      },
+                    }
+                  : action,
+            ),
+          },
+        } as never;
+      },
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.catalog"]({
+      req: {
+        type: "req",
+        id: "control-catalog-divergent-planned-action-preflight",
+        method: "prometheus.control.catalog",
+      },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
 });
 
 describe("prometheusHandlers.prometheus.control.preview", () => {
