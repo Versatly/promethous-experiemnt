@@ -265,6 +265,38 @@ describe("PROMETHEUS mutating-control guard", () => {
     );
   });
 
+  it("falls back to canonical metadata when planned metadata reason is blank", () => {
+    const metadata = getPrometheusPlannedMutatingMethodMetadata("prometheus.control.execute");
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const canonicalPreflight = buildPrometheusPlannedMutatingMethodPreflight({
+      method: "prometheus.control.execute",
+      metadata,
+    });
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.control.execute",
+      env: {},
+      resolvePlannedMethodPreflight: () => undefined,
+      resolvePlannedMethodMetadata: () =>
+        ({
+          access: "write",
+          mutatesState: true,
+          enabled: false,
+          enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+          requiredParams: ["action"],
+          reason: " ",
+        }) as never,
+    });
+    expect(error).toEqual(
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: canonicalPreflight.disabledMessage,
+      }),
+    );
+  });
+
   it("ignores planned metadata/preflight resolver results for non-planned methods", () => {
     const error = getPrometheusPlannedMutatingMethodGuardError({
       method: "prometheus.status",

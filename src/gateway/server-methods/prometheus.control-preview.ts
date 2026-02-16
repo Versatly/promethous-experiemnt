@@ -21,6 +21,7 @@ import {
 } from "./prometheus.params.js";
 import {
   hasPrometheusInvalidRequiredParams,
+  hasPrometheusInvalidReason,
   formatPrometheusRequiredParamsMessage,
   formatPrometheusMissingRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
@@ -236,6 +237,11 @@ export function assertPrometheusPlannedMutatingPreviewActionContract(args: {
         `PROMETHEUS planned control action contract mismatch: ${action} has invalid required params`,
       );
     }
+    if (hasPrometheusInvalidReason(metadata.reason)) {
+      throw new Error(
+        `PROMETHEUS planned control action contract mismatch: ${action} has invalid reason`,
+      );
+    }
     if (metadata.enableEnvVar !== PROMETHEUS_MUTATING_CONTROLS_ENV) {
       throw new Error(
         `PROMETHEUS planned control action contract mismatch: ${action} invalid env guard`,
@@ -310,7 +316,8 @@ function isPrometheusPlannedMutatingPreviewActionMetadataShape(
     typeof candidate.enableEnvVar === "string" &&
     isStringArray(candidate.requiredParams) &&
     !hasPrometheusInvalidRequiredParams(candidate.requiredParams) &&
-    typeof candidate.reason === "string"
+    typeof candidate.reason === "string" &&
+    !hasPrometheusInvalidReason(candidate.reason)
   );
 }
 

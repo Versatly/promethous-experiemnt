@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatPrometheusMissingRequiredParamsMessage,
   formatPrometheusRequiredParamsMessage,
+  hasPrometheusInvalidReason,
   hasPrometheusInvalidRequiredParams,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
@@ -70,5 +71,8 @@ describe("prometheus preflight guardrail messages", () => {
     expect(hasPrometheusInvalidRequiredParams(["proposal", "proposal"])).toBe(true);
     expect(hasPrometheusInvalidRequiredParams(["proposal", ""])).toBe(true);
     expect(hasPrometheusInvalidRequiredParams(["proposal", "   "])).toBe(true);
+    expect(hasPrometheusInvalidReason("Valid reason")).toBe(false);
+    expect(hasPrometheusInvalidReason("")).toBe(true);
+    expect(hasPrometheusInvalidReason("   ")).toBe(true);
   });
 });

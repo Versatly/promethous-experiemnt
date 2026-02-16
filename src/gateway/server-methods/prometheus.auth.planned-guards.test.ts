@@ -272,6 +272,54 @@ describe("PROMETHEUS gateway authorization planned mutating guardrails", () => {
     );
   });
 
+  it("keeps planned-method UNAVAILABLE fallback at request handling when metadata reason is blank", async () => {
+    const method = "prometheus.control.execute";
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-blank-reason-metadata-request-level",
+        method,
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodMetadata: () =>
+          ({
+            access: "write",
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+            requiredParams: ["action"],
+            reason: " ",
+          }) as never,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
+
   it("keeps planned-action UNAVAILABLE fallback at request handling when preflight resolver misses", async () => {
     const action = "autarch.gap-detection.commit";
     const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);

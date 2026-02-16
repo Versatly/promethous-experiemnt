@@ -43,6 +43,10 @@ export function hasPrometheusInvalidRequiredParams(requiredParams: readonly stri
   return new Set(requiredParams).size !== requiredParams.length;
 }
 
+export function hasPrometheusInvalidReason(reason: string): boolean {
+  return reason.trim().length === 0;
+}
+
 export function formatPrometheusRequiredParamsMessage(args: {
   kind: PrometheusControlSurfaceKind;
   name: string;

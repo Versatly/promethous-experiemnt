@@ -147,6 +147,24 @@ describe("PROMETHEUS method access map", () => {
     ).toThrow("invalid required params");
   });
 
+  it("fails fast when planned mutating method metadata has blank reason", () => {
+    expect(() =>
+      assertPrometheusPlannedMutatingMethodContract({
+        activeMethods: [],
+        plannedMutatingMethodMetadata: {
+          "prometheus.control.execute": {
+            access: "write",
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            requiredParams: ["action"],
+            reason: "   ",
+          },
+        },
+      }),
+    ).toThrow("invalid reason");
+  });
+
   it("only enables mutating controls when env var is set to 1", () => {
     expect(arePrometheusMutatingControlsEnabled({})).toBe(false);
     expect(arePrometheusMutatingControlsEnabled({ [PROMETHEUS_MUTATING_CONTROLS_ENV]: "0" })).toBe(

@@ -503,6 +503,43 @@ describe("prometheus control preview helpers", () => {
     });
   });
 
+  it("returns UNAVAILABLE when planned-action metadata reason is blank", async () => {
+    const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(
+      "autarch.gap-detection.commit",
+    );
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(preflight).toBeDefined();
+    expect(metadata).toBeDefined();
+    if (!preflight || !metadata) {
+      return;
+    }
+    const result = await runPrometheusControlPreview(
+      {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-1",
+      },
+      {
+        resolvePlannedActionMetadata: () =>
+          ({
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+            requiredParams: [...metadata.requiredParams],
+            reason: " ",
+          }) as never,
+      },
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: preflight.disabledMessage,
+      },
+    });
+  });
+
   it("fails fast when action metadata diverges from action list", () => {
     expect(() =>
       assertPrometheusControlPreviewActionContract({
@@ -587,5 +624,22 @@ describe("prometheus control preview helpers", () => {
         },
       }),
     ).toThrow("invalid required params");
+  });
+
+  it("fails fast when planned mutating action metadata has blank reason", () => {
+    expect(() =>
+      assertPrometheusPlannedMutatingPreviewActionContract({
+        activeActions: [],
+        plannedMutatingActionMetadata: {
+          "autarch.gap-detection.commit": {
+            mutatesState: true,
+            enabled: false,
+            enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+            requiredParams: ["goalId"],
+            reason: " ",
+          },
+        },
+      }),
+    ).toThrow("invalid reason");
   });
 });

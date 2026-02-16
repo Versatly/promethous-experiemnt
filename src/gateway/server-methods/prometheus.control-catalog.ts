@@ -17,7 +17,10 @@ import {
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
-import { hasPrometheusInvalidRequiredParams } from "./prometheus.preflight-guards.js";
+import {
+  hasPrometheusInvalidRequiredParams,
+  hasPrometheusInvalidReason,
+} from "./prometheus.preflight-guards.js";
 
 export type PrometheusControlCatalogSnapshot = {
   ts: number;
@@ -97,7 +100,8 @@ function isPrometheusPlannedMethodMetadataShape(
     typeof candidate.enableEnvVar === "string" &&
     isStringArray(candidate.requiredParams) &&
     !hasPrometheusInvalidRequiredParams(candidate.requiredParams) &&
-    typeof candidate.reason === "string"
+    typeof candidate.reason === "string" &&
+    !hasPrometheusInvalidReason(candidate.reason)
   );
 }
 
@@ -160,7 +164,8 @@ function isPrometheusPlannedActionMetadataShape(
     typeof candidate.enableEnvVar === "string" &&
     isStringArray(candidate.requiredParams) &&
     !hasPrometheusInvalidRequiredParams(candidate.requiredParams) &&
-    typeof candidate.reason === "string"
+    typeof candidate.reason === "string" &&
+    !hasPrometheusInvalidReason(candidate.reason)
   );
 }
 

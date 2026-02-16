@@ -9,7 +9,10 @@ import {
   type PrometheusGatewayMethodMetadata,
   type PrometheusPlannedMutatingMethodPreflight,
 } from "./prometheus-methods.js";
-import { hasPrometheusInvalidRequiredParams } from "./prometheus.preflight-guards.js";
+import {
+  hasPrometheusInvalidRequiredParams,
+  hasPrometheusInvalidReason,
+} from "./prometheus.preflight-guards.js";
 
 export type GatewayAuthorizationOverrides = {
   resolvePrometheusMethodMetadata?: (method: string) => PrometheusGatewayMethodMetadata | undefined;
@@ -48,7 +51,8 @@ function isPrometheusPlannedMutatingMethodMetadataShape(
     typeof candidate.enableEnvVar === "string" &&
     Array.isArray(candidate.requiredParams) &&
     !hasPrometheusInvalidRequiredParams(candidate.requiredParams) &&
-    typeof candidate.reason === "string"
+    typeof candidate.reason === "string" &&
+    !hasPrometheusInvalidReason(candidate.reason)
   );
 }
 
