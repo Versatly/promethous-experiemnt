@@ -223,6 +223,51 @@ describe("PROMETHEUS gateway authorization override invocation scope", () => {
     expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
   });
 
+  it("does not dispatch injected unknown handlers when node role is denied", async () => {
+    const method = "prometheus.unknown.gateway.method";
+    const unknownMethodHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not run for node-denied unknown method");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not run for node-denied unknown method");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not run for node-denied unknown method");
+    });
+    const respond = vi.fn();
+    await runPrometheusNodeRequest({
+      request: {
+        id: "unknown-prometheus-method-node-denied-before-handler-dispatch",
+        method,
+        params: {},
+      },
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+      extraHandlers: {
+        [method]: unknownMethodHandler,
+      },
+      respond,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: node"),
+      }),
+    );
+    expect(unknownMethodHandler).not.toHaveBeenCalled();
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
   it("invokes planned catalog resolvers for canonical planned method/action keys at request level", async () => {
     const plannedMethodKeys = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted();
     const plannedActionKeys = Object.keys(
