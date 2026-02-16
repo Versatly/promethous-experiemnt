@@ -75,4 +75,33 @@ describe("PROMETHEUS gateway authorization", () => {
       }),
     );
   });
+
+  it.each(READ_METHODS)("rejects node role access for %s", async (method) => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: `node-${method}`,
+        method,
+        params: method === "prometheus.trajectory" ? { goalId: "goal-root" } : {},
+      },
+      client: {
+        connect: {
+          role: "node",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: node"),
+      }),
+    );
+  });
 });
