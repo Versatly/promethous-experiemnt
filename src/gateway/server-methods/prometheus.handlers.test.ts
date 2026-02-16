@@ -923,6 +923,32 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
     );
   });
 
+  it("rejects planned mutating control preview action with UNAVAILABLE", async () => {
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-5", method: "prometheus.control.preview" },
+      params: {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-root",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining(
+          'Planned mutating action "autarch.gap-detection.commit" is disabled',
+        ),
+      }),
+    );
+  });
+
   it("does not mutate event log across preview actions", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
     const eventStore = createFilePrometheusEventStore(

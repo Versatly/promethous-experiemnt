@@ -138,6 +138,9 @@ These methods are intentionally scoped to telemetry and read models. They do not
       - required params: `goalId`
     - `recursion.mutation-evaluation`
       - required params: `proposal`, `baseline`, `candidate`
+  - planned mutating actions (for preflight visibility only) are exposed in
+    `prometheus.control.catalog.guardrails.plannedMutatingPreviewActions` and currently return
+    `UNAVAILABLE` until explicit rollout.
 
 Action-level contract metadata is centralized in gateway code (`PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA`)
 and locked by unit/e2e tests to prevent control-surface drift during future write-method rollout.

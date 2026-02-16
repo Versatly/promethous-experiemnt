@@ -10,7 +10,10 @@ import {
 } from "../../prometheus/index.js";
 import { type ErrorCode, ErrorCodes } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
-import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
+import {
+  arePrometheusMutatingControlsEnabled,
+  PROMETHEUS_MUTATING_CONTROLS_ENV,
+} from "./prometheus-methods.js";
 import {
   resolveMaxItems,
   resolveObserverStateDir,
@@ -77,6 +80,9 @@ export const PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA = {
   },
 } as const satisfies Record<string, PrometheusPlannedMutatingPreviewActionMetadata>;
 
+export type PrometheusPlannedMutatingPreviewAction =
+  keyof typeof PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA;
+
 export function listPrometheusMutatingPreviewActions(
   actionMetadata: Record<
     string,
@@ -99,6 +105,12 @@ export function listPrometheusPlannedMutatingPreviewActions(
     .filter(([, metadata]) => !metadata.enabled && metadata.mutatesState)
     .map(([action]) => action)
     .toSorted();
+}
+
+export function isPrometheusPlannedMutatingPreviewAction(
+  value: unknown,
+): value is PrometheusPlannedMutatingPreviewAction {
+  return typeof value === "string" && value in PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA;
 }
 
 export function assertPrometheusControlPreviewActionContract(args: {
@@ -255,6 +267,16 @@ function unavailableError(error: unknown): PrometheusControlPreviewFailure {
   };
 }
 
+function unavailableRequest(message: string): PrometheusControlPreviewFailure {
+  return {
+    ok: false,
+    error: {
+      code: ErrorCodes.UNAVAILABLE,
+      message,
+    },
+  };
+}
+
 export function isPrometheusControlPreviewAction(
   value: unknown,
 ): value is PrometheusControlPreviewAction {
@@ -274,6 +296,15 @@ export async function runPrometheusControlPreview(
         : null;
     if (!rawAction) {
       return invalidRequest("action is required for prometheus.control.preview");
+    }
+    if (isPrometheusPlannedMutatingPreviewAction(rawAction)) {
+      const controlsEnabled = arePrometheusMutatingControlsEnabled();
+      if (!controlsEnabled) {
+        return unavailableRequest(
+          `Planned mutating action "${rawAction}" is disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable guardrail preflight)`,
+        );
+      }
+      return unavailableRequest(`Planned mutating action "${rawAction}" is not implemented yet`);
     }
     if (!isPrometheusControlPreviewAction(rawAction)) {
       return invalidRequest(`Unsupported control preview action "${rawAction}"`);

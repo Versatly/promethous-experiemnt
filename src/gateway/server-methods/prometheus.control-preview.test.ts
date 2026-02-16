@@ -1,15 +1,17 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
 } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
+import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 import {
   assertPrometheusControlPreviewActionContract,
   assertPrometheusPlannedMutatingPreviewActionContract,
+  isPrometheusPlannedMutatingPreviewAction,
   listPrometheusPlannedMutatingPreviewActions,
   listPrometheusMutatingPreviewActions,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
@@ -32,6 +34,7 @@ afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true });
   }
   cleanupDirs.clear();
+  vi.unstubAllEnvs();
 });
 
 describe("prometheus control preview helpers", () => {
@@ -66,6 +69,8 @@ describe("prometheus control preview helpers", () => {
       "helios.trajectory-evaluation.commit",
       "recursion.mutation-evaluation.commit",
     ]);
+    expect(isPrometheusPlannedMutatingPreviewAction("autarch.gap-detection.commit")).toBe(true);
+    expect(isPrometheusPlannedMutatingPreviewAction("autarch.gap-detection")).toBe(false);
   });
 
   it("returns INVALID_REQUEST for missing or unsupported actions", async () => {
@@ -261,6 +266,35 @@ describe("prometheus control preview helpers", () => {
       error: {
         code: ErrorCodes.INVALID_REQUEST,
         message: "baseline and candidate fitness snapshots are required",
+      },
+    });
+  });
+
+  it("returns UNAVAILABLE when planned mutating action is disabled", async () => {
+    const result = await runPrometheusControlPreview({
+      action: "autarch.gap-detection.commit",
+      goalId: "goal-1",
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: `Planned mutating action "autarch.gap-detection.commit" is disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable guardrail preflight)`,
+      },
+    });
+  });
+
+  it("returns UNAVAILABLE for planned mutating actions even when env guard is enabled", async () => {
+    vi.stubEnv(PROMETHEUS_MUTATING_CONTROLS_ENV, "1");
+    const result = await runPrometheusControlPreview({
+      action: "autarch.gap-detection.commit",
+      goalId: "goal-1",
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: 'Planned mutating action "autarch.gap-detection.commit" is not implemented yet',
       },
     });
   });

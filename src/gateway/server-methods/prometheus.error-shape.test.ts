@@ -192,4 +192,29 @@ describe("prometheus handler error shape parity", () => {
       }),
     );
   });
+
+  it("uses UNAVAILABLE for planned mutating preview actions before rollout", async () => {
+    const plannedActionRespond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-planned-disabled", method: "prometheus.control.preview" },
+      params: {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-1",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond: plannedActionRespond,
+      context: {} as GatewayRequestContext,
+    });
+    expect(plannedActionRespond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining(
+          'Planned mutating action "autarch.gap-detection.commit" is disabled',
+        ),
+      }),
+    );
+  });
 });
