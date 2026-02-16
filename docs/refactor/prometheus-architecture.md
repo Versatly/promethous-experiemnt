@@ -126,8 +126,11 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `preview`
   - supported `action` values:
     - `autarch.gap-detection`
+      - required params: optional `maxItems`
     - `helios.trajectory-evaluation`
+      - required params: `goalId`
     - `recursion.mutation-evaluation`
+      - required params: `proposal`, `baseline`, `candidate`
 
 Compatibility tests lock this response shape so method consumers can rely on stable key-level
 contracts during migration.

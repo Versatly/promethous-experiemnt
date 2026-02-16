@@ -723,6 +723,68 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("returns recursion control preview payload for operator.write", async () => {
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-recursion-preview",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-recursion-preview",
+        method: "prometheus.control.preview",
+        params: {
+          action: "recursion.mutation-evaluation",
+          proposal: {
+            mutationId: "mut-e2e-1",
+            title: "Increase objective fit",
+            hypothesis: "small mutation raises fit with acceptable risk",
+            risk: "low",
+            expectedGain: 0.08,
+          },
+          baseline: {
+            objectiveFit: 0.52,
+            stability: 0.74,
+            throughput: 0.53,
+          },
+          candidate: {
+            objectiveFit: 0.64,
+            stability: 0.76,
+            throughput: 0.55,
+          },
+        },
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      payload?: {
+        action?: string;
+        mutatesState?: boolean;
+        preview?: {
+          evaluation?: {
+            mutationId?: string;
+            accepted?: boolean;
+            scoreDelta?: number;
+          };
+        };
+      };
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.action).toBe("recursion.mutation-evaluation");
+    expect(response.payload?.mutatesState).toBe(false);
+    expect(response.payload?.preview?.evaluation?.mutationId).toBe("mut-e2e-1");
+    expect(typeof response.payload?.preview?.evaluation?.accepted).toBe("boolean");
+    expect(typeof response.payload?.preview?.evaluation?.scoreDelta).toBe("number");
+    expect(response.error).toBeUndefined();
+    ws.close();
+  });
+
   it("rejects operator.read scope for prometheus.control.preview", async () => {
     const { ws } = await harness.openClient({
       role: "operator",
@@ -780,6 +842,43 @@ describe("gateway prometheus.status", () => {
     expect(response.error?.code).toBe("INVALID_REQUEST");
     expect(response.error?.message).toContain(
       'Unsupported control preview action "unsupported.action"',
+    );
+    ws.close();
+  });
+
+  it("returns INVALID_REQUEST for incomplete recursion control preview params", async () => {
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-recursion-invalid",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-recursion-invalid",
+        method: "prometheus.control.preview",
+        params: {
+          action: "recursion.mutation-evaluation",
+          proposal: {
+            mutationId: "mut-e2e-invalid",
+            title: "Invalid mutation",
+            hypothesis: "missing baseline/candidate",
+          },
+        },
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { code?: string; message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.code).toBe("INVALID_REQUEST");
+    expect(response.error?.message).toContain(
+      "baseline and candidate fitness snapshots are required",
     );
     ws.close();
   });
