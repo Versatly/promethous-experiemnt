@@ -113,4 +113,83 @@ describe("prometheus handler error shape parity", () => {
       expect.objectContaining({ code: ErrorCodes.INVALID_REQUEST }),
     );
   });
+
+  it("uses INVALID_REQUEST for control preview validation failures", async () => {
+    const missingActionRespond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-missing-action", method: "prometheus.control.preview" },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond: missingActionRespond,
+      context: {} as GatewayRequestContext,
+    });
+    expect(missingActionRespond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_REQUEST,
+        message: "action is required for prometheus.control.preview",
+      }),
+    );
+
+    const unsupportedActionRespond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-unsupported", method: "prometheus.control.preview" },
+      params: { action: "unsupported.action" },
+      client: null,
+      isWebchatConnect: () => false,
+      respond: unsupportedActionRespond,
+      context: {} as GatewayRequestContext,
+    });
+    expect(unsupportedActionRespond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_REQUEST,
+        message: 'Unsupported control preview action "unsupported.action"',
+      }),
+    );
+
+    const stateDir = await makeTempDir("gateway-prometheus-errors-");
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-rec-goal",
+      type: "goal.created",
+      occurredAt: 1,
+      payload: {
+        goalId: "goal-rec",
+        title: "Recursion goal",
+        objective: "Evaluate mutation",
+      },
+    });
+
+    const incompleteRecursionRespond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-rec-invalid", method: "prometheus.control.preview" },
+      params: {
+        stateDir,
+        action: "recursion.mutation-evaluation",
+        proposal: {
+          mutationId: "mut-1",
+          title: "Invalid proposal",
+          hypothesis: "missing snapshots",
+        },
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond: incompleteRecursionRespond,
+      context: {} as GatewayRequestContext,
+    });
+    expect(incompleteRecursionRespond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_REQUEST,
+        message: "baseline and candidate fitness snapshots are required",
+      }),
+    );
+  });
 });
