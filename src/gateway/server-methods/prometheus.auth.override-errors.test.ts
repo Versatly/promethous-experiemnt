@@ -71,6 +71,42 @@ describe("PROMETHEUS gateway authorization override error handling", () => {
     );
   });
 
+  it("does not dispatch injected planned-method handlers when planned metadata override throws", async () => {
+    const method = "prometheus.control.execute";
+    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const respond = vi.fn();
+    await runPrometheusWriteRequest({
+      request: {
+        id: "planned-auth-override-throws-before-planned-handler-dispatch",
+        method,
+        params: {},
+      },
+      respond,
+      authOverrides: {
+        resolvePrometheusPlannedMethodMetadata: () => {
+          throw new Error("auth override dependency exploded before planned handler dispatch");
+        },
+      },
+      extraHandlers: {
+        [method]: plannedExecuteHandler,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining(
+          "auth override dependency exploded before planned handler dispatch",
+        ),
+      }),
+    );
+    expect(plannedExecuteHandler).not.toHaveBeenCalled();
+  });
+
   it("returns UNAVAILABLE when injected method metadata auth override throws", async () => {
     const respond = vi.fn();
     await runPrometheusReadRequest({
@@ -158,5 +194,41 @@ describe("PROMETHEUS gateway authorization override error handling", () => {
         message: expect.stringContaining("planned preflight override exploded"),
       }),
     );
+  });
+
+  it("does not dispatch injected planned-method handlers when planned preflight override throws", async () => {
+    const method = "prometheus.control.execute";
+    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const respond = vi.fn();
+    await runPrometheusWriteRequest({
+      request: {
+        id: "planned-preflight-override-throws-before-planned-handler-dispatch",
+        method,
+        params: {},
+      },
+      respond,
+      authOverrides: {
+        resolvePrometheusPlannedMethodPreflight: () => {
+          throw new Error("planned preflight override exploded before planned handler dispatch");
+        },
+      },
+      extraHandlers: {
+        [method]: plannedExecuteHandler,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining(
+          "planned preflight override exploded before planned handler dispatch",
+        ),
+      }),
+    );
+    expect(plannedExecuteHandler).not.toHaveBeenCalled();
   });
 });
