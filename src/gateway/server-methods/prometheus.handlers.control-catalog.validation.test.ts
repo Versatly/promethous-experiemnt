@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { ErrorCodes } from "../protocol/index.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
+import { runPrometheusControlCatalogHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
 describe("prometheusHandlers.prometheus.control.catalog injected snapshot validation", () => {
@@ -12,17 +12,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected snapshot valida
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-dependency-error",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-dependency-error",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -40,17 +33,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected snapshot valida
       buildControlCatalogSnapshot: () => ({ ts: Date.now() }) as never,
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-invalid-shape",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-invalid-shape",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -82,17 +68,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected snapshot valida
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-invalid-nested-shape",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-invalid-nested-shape",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

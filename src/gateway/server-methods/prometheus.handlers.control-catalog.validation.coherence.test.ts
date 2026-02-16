@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { ErrorCodes } from "../protocol/index.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
+import { runPrometheusControlCatalogHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
 describe("prometheusHandlers.prometheus.control.catalog injected coherence validation", () => {
@@ -19,17 +19,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected coherence valid
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-invalid-summary",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-invalid-summary",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -56,17 +49,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected coherence valid
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-invalid-read-write-summary",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-invalid-read-write-summary",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -101,17 +87,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected coherence valid
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-divergent-planned-method",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-divergent-planned-method",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -149,17 +128,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected coherence valid
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-divergent-planned-action-preflight",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-divergent-planned-action-preflight",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -185,17 +157,10 @@ describe("prometheusHandlers.prometheus.control.catalog injected coherence valid
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "control-catalog-divergent-method-coverage",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "control-catalog-divergent-method-coverage",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

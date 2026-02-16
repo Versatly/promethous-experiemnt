@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { ErrorCodes } from "../protocol/index.js";
+import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
 describe("prometheusHandlers dependency isolation (control preview)", () => {
@@ -26,19 +26,13 @@ describe("prometheusHandlers dependency isolation (control preview)", () => {
     });
 
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "preview-dependency-isolation",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "preview-dependency-isolation",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -76,19 +70,13 @@ describe("prometheusHandlers dependency isolation (control preview)", () => {
     });
 
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "preview-dependency-forwarding",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "preview-dependency-forwarding",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -125,20 +113,14 @@ describe("prometheusHandlers dependency isolation (control preview)", () => {
     });
 
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "preview-injected-runner-precedence",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "preview-injected-runner-precedence",
       params: {
         action: "autarch.gap-detection.commit",
         goalId: "goal-1",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -164,20 +146,14 @@ describe("prometheusHandlers dependency isolation (control preview)", () => {
     });
 
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "preview-default-runner-dependency",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "preview-default-runner-dependency",
       params: {
         action: "autarch.gap-detection.commit",
         goalId: "goal-1",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(resolvePlannedActionMetadata).toHaveBeenCalledTimes(1);
@@ -203,19 +179,13 @@ describe("prometheusHandlers dependency isolation (control preview)", () => {
     });
 
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "preview-default-runner-active-action-short-circuit",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "preview-default-runner-active-action-short-circuit",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

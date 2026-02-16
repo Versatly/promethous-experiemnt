@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { ErrorCodes } from "../protocol/index.js";
+import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
 describe("prometheusHandlers.prometheus.control.preview injected result validation", () => {
@@ -21,19 +21,13 @@ describe("prometheusHandlers.prometheus.control.preview injected result validati
         }) as never,
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "control-preview-invalid-success-mutability",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "control-preview-invalid-success-mutability",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -63,19 +57,13 @@ describe("prometheusHandlers.prometheus.control.preview injected result validati
         }) as never,
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "control-preview-invalid-success-preview-shape",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "control-preview-invalid-success-preview-shape",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -112,19 +100,13 @@ describe("prometheusHandlers.prometheus.control.preview injected result validati
         }) as never,
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "control-preview-invalid-autarch-count",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "control-preview-invalid-autarch-count",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -162,20 +144,14 @@ describe("prometheusHandlers.prometheus.control.preview injected result validati
         }) as never,
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "control-preview-invalid-helios-ratio-bounds",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "control-preview-invalid-helios-ratio-bounds",
       params: {
         action: "helios.trajectory-evaluation",
         goalId: "goal-1",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

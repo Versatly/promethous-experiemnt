@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import { ErrorCodes } from "../protocol/index.js";
+import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
 describe("prometheusHandlers.prometheus.control.preview injected error normalization", () => {
@@ -11,19 +11,13 @@ describe("prometheusHandlers.prometheus.control.preview injected error normaliza
       },
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "control-preview-dependency-error",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "control-preview-dependency-error",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -41,19 +35,13 @@ describe("prometheusHandlers.prometheus.control.preview injected error normaliza
       runControlPreview: async () => ({ ok: true }) as never,
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "control-preview-invalid-shape",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "control-preview-invalid-shape",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -78,19 +66,13 @@ describe("prometheusHandlers.prometheus.control.preview injected error normaliza
         }) as never,
     });
     const respond = vi.fn();
-    await handlers["prometheus.control.preview"]({
-      req: {
-        type: "req",
-        id: "control-preview-invalid-error-code",
-        method: "prometheus.control.preview",
-      },
+    await runPrometheusControlPreviewHandler({
+      handlers,
+      requestId: "control-preview-invalid-error-code",
       params: {
         action: "autarch.gap-detection",
       },
-      client: null,
-      isWebchatConnect: () => false,
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(

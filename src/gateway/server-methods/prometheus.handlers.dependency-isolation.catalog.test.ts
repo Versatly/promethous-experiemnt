@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestContext } from "./types.js";
 import {
   getPrometheusPlannedMutatingMethodMetadata,
   getPrometheusPlannedMutatingMethodPreflight,
@@ -11,6 +10,7 @@ import {
   getPrometheusPlannedMutatingPreviewActionPreflight,
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
+import { runPrometheusControlCatalogHandler } from "./prometheus.handler-test-helpers.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
 describe("prometheusHandlers dependency isolation (control catalog)", () => {
@@ -27,17 +27,10 @@ describe("prometheusHandlers dependency isolation (control catalog)", () => {
     });
 
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "catalog-dependency-isolation",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "catalog-dependency-isolation",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
@@ -87,17 +80,10 @@ describe("prometheusHandlers dependency isolation (control catalog)", () => {
     });
 
     const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "catalog-planned-resolver-scope",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
+    await runPrometheusControlCatalogHandler({
+      handlers,
+      requestId: "catalog-planned-resolver-scope",
       respond,
-      context: {} as GatewayRequestContext,
     });
 
     expect(respond).toHaveBeenCalledWith(
