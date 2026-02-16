@@ -1,4 +1,5 @@
 import {
+  buildPrometheusPlannedMutatingMethodPreflight,
   listPrometheusMutatingMethods,
   listPrometheusPlannedMutatingMethods,
   arePrometheusMutatingControlsEnabled,
@@ -8,6 +9,7 @@ import {
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./prometheus-methods.js";
 import {
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
   listPrometheusMutatingPreviewActions,
   listPrometheusPlannedMutatingPreviewActions,
   getPrometheusPlannedMutatingPreviewActionMetadata,
@@ -143,10 +145,12 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
         if (!metadata) {
           throw new Error(`Missing planned mutating method metadata for "${method}"`);
         }
-        const preflight = resolvePlannedMethodPreflight(method);
-        if (!preflight) {
-          throw new Error(`Missing planned mutating method preflight for "${method}"`);
-        }
+        const preflight =
+          resolvePlannedMethodPreflight(method) ??
+          buildPrometheusPlannedMutatingMethodPreflight({
+            method,
+            metadata,
+          });
         return {
           method,
           ...metadata,
@@ -158,10 +162,12 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
         if (!metadata) {
           throw new Error(`Missing planned mutating action metadata for "${action}"`);
         }
-        const preflight = resolvePlannedActionPreflight(action);
-        if (!preflight) {
-          throw new Error(`Missing planned mutating action preflight for "${action}"`);
-        }
+        const preflight =
+          resolvePlannedActionPreflight(action) ??
+          buildPrometheusPlannedMutatingPreviewActionPreflight({
+            action,
+            metadata,
+          });
         return {
           action,
           ...metadata,

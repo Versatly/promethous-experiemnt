@@ -141,14 +141,26 @@ describe("prometheus control catalog builder", () => {
     ).toThrow(`Missing planned mutating method metadata for "${plannedMethod}"`);
   });
 
-  it("fails fast when planned mutating method preflight lookup misses known entries", () => {
+  it("falls back when planned mutating method preflight lookup misses known entries", () => {
     const plannedMethod = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted()[0]!;
-    expect(() =>
-      buildPrometheusControlCatalogSnapshot({
-        env: {},
-        resolvePlannedMethodPreflight: () => undefined,
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(plannedMethod);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedMethodPreflight: () => undefined,
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.find((method) => method.method === plannedMethod)
+        ?.preflight,
+    ).toEqual(
+      buildPrometheusPlannedMutatingMethodPreflight({
+        method: plannedMethod,
+        metadata,
       }),
-    ).toThrow(`Missing planned mutating method preflight for "${plannedMethod}"`);
+    );
   });
 
   it("fails fast when planned mutating action metadata lookup misses known entries", () => {
@@ -163,15 +175,28 @@ describe("prometheus control catalog builder", () => {
     ).toThrow(`Missing planned mutating action metadata for "${plannedAction}"`);
   });
 
-  it("fails fast when planned mutating action preflight lookup misses known entries", () => {
+  it("falls back when planned mutating action preflight lookup misses known entries", () => {
     const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
       .toSorted()
       .at(0)!;
-    expect(() =>
-      buildPrometheusControlCatalogSnapshot({
-        env: {},
-        resolvePlannedActionPreflight: () => undefined,
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(plannedAction);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedActionPreflight: () => undefined,
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.find(
+        (action) => action.action === plannedAction,
+      )?.preflight,
+    ).toEqual(
+      buildPrometheusPlannedMutatingPreviewActionPreflight({
+        action: plannedAction,
+        metadata,
       }),
-    ).toThrow(`Missing planned mutating action preflight for "${plannedAction}"`);
+    );
   });
 });
