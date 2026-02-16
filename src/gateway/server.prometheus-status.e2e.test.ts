@@ -883,6 +883,89 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("does not mutate event stream when running control preview actions", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-control-non-mutating-goal",
+      type: "goal.created",
+      occurredAt: 53,
+      payload: {
+        goalId: "goal-control-non-mutating",
+        title: "Control non-mutating goal",
+        objective: "Ensure preview does not append events",
+        priority: 90,
+      },
+    });
+
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+
+    const statusBeforeP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-non-mutating-status-before",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-non-mutating-status-before",
+        method: "prometheus.status",
+      }),
+    );
+    const statusBefore = (await statusBeforeP) as {
+      ok?: boolean;
+      payload?: { eventCount?: number };
+    };
+    expect(statusBefore.ok).toBe(true);
+
+    const controlP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-non-mutating-preview",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-non-mutating-preview",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      }),
+    );
+    const controlRes = (await controlP) as {
+      ok?: boolean;
+      payload?: { mutatesState?: boolean };
+    };
+    expect(controlRes.ok).toBe(true);
+    expect(controlRes.payload?.mutatesState).toBe(false);
+
+    const statusAfterP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-non-mutating-status-after",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-non-mutating-status-after",
+        method: "prometheus.status",
+      }),
+    );
+    const statusAfter = (await statusAfterP) as {
+      ok?: boolean;
+      payload?: { eventCount?: number };
+    };
+    expect(statusAfter.ok).toBe(true);
+    expect(statusAfter.payload?.eventCount).toBe(statusBefore.payload?.eventCount);
+    ws.close();
+  });
+
   it("keeps status and autarch summary counts consistent in e2e flow", async () => {
     const stateDir = resolveStateDir();
     const eventStore = createFilePrometheusEventStore(

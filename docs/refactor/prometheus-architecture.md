@@ -166,6 +166,10 @@ PROMETHEUS adapters are split between read telemetry and control preview surface
 
 This keeps parity with existing gateway authorization semantics for telemetry methods.
 
+Method-level access and mutability metadata is centralized in gateway code
+(`PROMETHEUS_GATEWAY_METHOD_METADATA`) so read/write scope partitioning and non-mutating guarantees
+can be asserted in tests as new control methods are introduced.
+
 ## Scope boundaries
 
 The initial PROMETHEUS implementation in this repository focuses on:

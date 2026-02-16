@@ -14,10 +14,7 @@ import { healthHandlers } from "./server-methods/health.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
-import {
-  PROMETHEUS_GATEWAY_READ_METHODS,
-  PROMETHEUS_GATEWAY_WRITE_METHODS,
-} from "./server-methods/prometheus-methods.js";
+import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./server-methods/prometheus-methods.js";
 import { prometheusHandlers } from "./server-methods/prometheus.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
@@ -57,6 +54,12 @@ const PAIRING_METHODS = new Set([
   "node.rename",
 ]);
 const ADMIN_METHOD_PREFIXES = ["exec.approvals."];
+const PROMETHEUS_READ_METHODS = Object.entries(PROMETHEUS_GATEWAY_METHOD_METADATA)
+  .filter(([, metadata]) => metadata.access === "read")
+  .map(([method]) => method);
+const PROMETHEUS_WRITE_METHODS = Object.entries(PROMETHEUS_GATEWAY_METHOD_METADATA)
+  .filter(([, metadata]) => metadata.access === "write")
+  .map(([method]) => method);
 const READ_METHODS = new Set([
   "health",
   "logs.tail",
@@ -83,7 +86,7 @@ const READ_METHODS = new Set([
   "chat.history",
   "config.get",
   "talk.config",
-  ...PROMETHEUS_GATEWAY_READ_METHODS,
+  ...PROMETHEUS_READ_METHODS,
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -100,7 +103,7 @@ const WRITE_METHODS = new Set([
   "chat.send",
   "chat.abort",
   "browser.request",
-  ...PROMETHEUS_GATEWAY_WRITE_METHODS,
+  ...PROMETHEUS_WRITE_METHODS,
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
