@@ -55,6 +55,143 @@ export function assertPrometheusHandlerContract(args: {
   }
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isPrometheusPlannedPreflightShape(
+  value: unknown,
+): value is {
+  disabledMessage: string;
+  notImplementedMessage: string;
+  requiredParamsMessage: string;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as {
+    disabledMessage?: unknown;
+    notImplementedMessage?: unknown;
+    requiredParamsMessage?: unknown;
+  };
+  return (
+    typeof candidate.disabledMessage === "string" &&
+    typeof candidate.notImplementedMessage === "string" &&
+    typeof candidate.requiredParamsMessage === "string"
+  );
+}
+
+function isPrometheusCatalogMethodEntry(
+  value: unknown,
+): value is { method: string; access: string; mutatesState: boolean } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as { method?: unknown; access?: unknown; mutatesState?: unknown };
+  return (
+    typeof candidate.method === "string" &&
+    typeof candidate.access === "string" &&
+    typeof candidate.mutatesState === "boolean"
+  );
+}
+
+function isPrometheusCatalogPreviewActionEntry(
+  value: unknown,
+): value is { action: string; mutatesState: boolean; requiredParams: readonly string[] } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as {
+    action?: unknown;
+    mutatesState?: unknown;
+    requiredParams?: unknown;
+  };
+  return (
+    typeof candidate.action === "string" &&
+    typeof candidate.mutatesState === "boolean" &&
+    isStringArray(candidate.requiredParams)
+  );
+}
+
+function isPrometheusCatalogPlannedMethodEntry(value: unknown): value is {
+  method: string;
+  access: string;
+  mutatesState: boolean;
+  enabled: boolean;
+  enableEnvVar: string;
+  requiredParams: readonly string[];
+  reason: string;
+  preflight: {
+    disabledMessage: string;
+    notImplementedMessage: string;
+    requiredParamsMessage: string;
+  };
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as {
+    method?: unknown;
+    access?: unknown;
+    mutatesState?: unknown;
+    enabled?: unknown;
+    enableEnvVar?: unknown;
+    requiredParams?: unknown;
+    reason?: unknown;
+    preflight?: unknown;
+  };
+  return (
+    typeof candidate.method === "string" &&
+    typeof candidate.access === "string" &&
+    typeof candidate.mutatesState === "boolean" &&
+    typeof candidate.enabled === "boolean" &&
+    typeof candidate.enableEnvVar === "string" &&
+    isStringArray(candidate.requiredParams) &&
+    typeof candidate.reason === "string" &&
+    isPrometheusPlannedPreflightShape(candidate.preflight)
+  );
+}
+
+function isPrometheusCatalogPlannedActionEntry(value: unknown): value is {
+  action: string;
+  mutatesState: boolean;
+  enabled: boolean;
+  enableEnvVar: string;
+  requiredParams: readonly string[];
+  reason: string;
+  preflight: {
+    disabledMessage: string;
+    notImplementedMessage: string;
+    requiredParamsMessage: string;
+  };
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as {
+    action?: unknown;
+    mutatesState?: unknown;
+    enabled?: unknown;
+    enableEnvVar?: unknown;
+    requiredParams?: unknown;
+    reason?: unknown;
+    preflight?: unknown;
+  };
+  return (
+    typeof candidate.action === "string" &&
+    typeof candidate.mutatesState === "boolean" &&
+    typeof candidate.enabled === "boolean" &&
+    typeof candidate.enableEnvVar === "string" &&
+    isStringArray(candidate.requiredParams) &&
+    typeof candidate.reason === "string" &&
+    isPrometheusPlannedPreflightShape(candidate.preflight)
+  );
+}
+
 function isPrometheusControlCatalogSnapshot(
   value: unknown,
 ): value is PrometheusControlCatalogSnapshot {
@@ -62,17 +199,41 @@ function isPrometheusControlCatalogSnapshot(
     return false;
   }
   const candidate = value as Partial<PrometheusControlCatalogSnapshot>;
+  const summary = candidate.summary as
+    | Partial<PrometheusControlCatalogSnapshot["summary"]>
+    | undefined;
+  const guardrails = candidate.guardrails as
+    | Partial<PrometheusControlCatalogSnapshot["guardrails"]>
+    | undefined;
+  const controlPreview = candidate.controlPreview as
+    | Partial<PrometheusControlCatalogSnapshot["controlPreview"]>
+    | undefined;
   return (
-    typeof candidate.ts === "number" &&
-    !!candidate.summary &&
-    typeof candidate.summary === "object" &&
-    !!candidate.guardrails &&
-    typeof candidate.guardrails === "object" &&
+    isFiniteNumber(candidate.ts) &&
+    !!summary &&
+    isFiniteNumber(summary.totalMethods) &&
+    isFiniteNumber(summary.readMethods) &&
+    isFiniteNumber(summary.writeMethods) &&
+    isFiniteNumber(summary.mutatingMethods) &&
+    isFiniteNumber(summary.plannedMutatingMethods) &&
+    isFiniteNumber(summary.previewActions) &&
+    isFiniteNumber(summary.mutatingPreviewActions) &&
+    isFiniteNumber(summary.plannedMutatingPreviewActions) &&
+    !!guardrails &&
+    typeof guardrails.mutationsEnabled === "boolean" &&
+    typeof guardrails.enableEnvVar === "string" &&
+    isStringArray(guardrails.mutatingMethods) &&
+    isStringArray(guardrails.mutatingPreviewActions) &&
+    Array.isArray(guardrails.plannedMutatingMethods) &&
+    guardrails.plannedMutatingMethods.every(isPrometheusCatalogPlannedMethodEntry) &&
+    Array.isArray(guardrails.plannedMutatingPreviewActions) &&
+    guardrails.plannedMutatingPreviewActions.every(isPrometheusCatalogPlannedActionEntry) &&
     Array.isArray(candidate.methods) &&
-    !!candidate.controlPreview &&
-    typeof candidate.controlPreview === "object" &&
-    candidate.controlPreview.method === "prometheus.control.preview" &&
-    Array.isArray(candidate.controlPreview.actions)
+    candidate.methods.every(isPrometheusCatalogMethodEntry) &&
+    !!controlPreview &&
+    controlPreview.method === "prometheus.control.preview" &&
+    Array.isArray(controlPreview.actions) &&
+    controlPreview.actions.every(isPrometheusCatalogPreviewActionEntry)
   );
 }
 

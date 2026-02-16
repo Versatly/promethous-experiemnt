@@ -14,6 +14,7 @@ import {
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./prometheus-methods.js";
+import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
@@ -802,6 +803,48 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
       req: {
         type: "req",
         id: "control-catalog-invalid-shape",
+        method: "prometheus.control.catalog",
+      },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
+
+  it("returns UNAVAILABLE when injected catalog snapshot has invalid nested entries", async () => {
+    const handlers = createPrometheusHandlers({
+      buildControlCatalogSnapshot: () => {
+        const snapshot = buildPrometheusControlCatalogSnapshot();
+        return {
+          ...snapshot,
+          guardrails: {
+            ...snapshot.guardrails,
+            plannedMutatingMethods: [
+              {
+                ...snapshot.guardrails.plannedMutatingMethods[0],
+                requiredParams: 123,
+              },
+            ],
+          },
+        } as never;
+      },
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.catalog"]({
+      req: {
+        type: "req",
+        id: "control-catalog-invalid-nested-shape",
         method: "prometheus.control.catalog",
       },
       params: {},
