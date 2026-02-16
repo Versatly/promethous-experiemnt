@@ -1,47 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { ErrorCodes } from "../protocol/index.js";
-import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
 import { createPrometheusHandlers } from "./prometheus.js";
 
-describe("prometheusHandlers dependency isolation", () => {
-  it("does not invoke control-preview runner dependency for catalog requests", async () => {
-    const runControlPreview = vi.fn(async () => {
-      throw new Error("control preview dependency should not be called");
-    });
-    const buildControlCatalogSnapshot = vi.fn(() =>
-      buildPrometheusControlCatalogSnapshot({ env: {}, now: 123 }),
-    );
-    const handlers = createPrometheusHandlers({
-      runControlPreview,
-      buildControlCatalogSnapshot,
-    });
-
-    const respond = vi.fn();
-    await handlers["prometheus.control.catalog"]({
-      req: {
-        type: "req",
-        id: "catalog-dependency-isolation",
-        method: "prometheus.control.catalog",
-      },
-      params: {},
-      client: null,
-      isWebchatConnect: () => false,
-      respond,
-      context: {} as GatewayRequestContext,
-    });
-
-    expect(respond).toHaveBeenCalledWith(
-      true,
-      expect.objectContaining({
-        ts: 123,
-      }),
-      undefined,
-    );
-    expect(buildControlCatalogSnapshot).toHaveBeenCalledTimes(1);
-    expect(runControlPreview).not.toHaveBeenCalled();
-  });
-
+describe("prometheusHandlers dependency isolation (control preview)", () => {
   it("does not invoke control-catalog snapshot dependency for preview requests", async () => {
     const buildControlCatalogSnapshot = vi.fn(() => {
       throw new Error("catalog snapshot dependency should not be called");
