@@ -81,6 +81,7 @@ const READ_METHODS = new Set([
   "talk.config",
   "prometheus.status",
   "prometheus.goals",
+  "prometheus.recursion",
 ]);
 const WRITE_METHODS = new Set([
   "send",

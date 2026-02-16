@@ -213,4 +213,85 @@ describe("gateway prometheus.status", () => {
     expect(childGoal?.capabilityCoverage?.provisionalCount).toBe(1);
     ws.close();
   });
+
+  it("returns recursion cycle telemetry window from prometheus.recursion", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.appendBatch([
+      {
+        id: "evt-rec-goal",
+        type: "goal.created",
+        occurredAt: 20,
+        payload: {
+          goalId: "goal-rec",
+          title: "Recursion goal",
+          objective: "Optimize recursively",
+          priority: 95,
+        },
+      },
+      {
+        id: "evt-rec-1",
+        type: "recursion.cycle-recorded",
+        occurredAt: 21,
+        payload: {
+          cycleId: "cycle-rec-1",
+          summary: "accepted mutation",
+          mutationId: "mut-rec-1",
+          accepted: true,
+          evaluationScore: 0.13,
+          occurredAt: 21,
+        },
+      },
+      {
+        id: "evt-rec-2",
+        type: "recursion.cycle-recorded",
+        occurredAt: 22,
+        payload: {
+          cycleId: "cycle-rec-2",
+          summary: "rollback",
+          rollbackOfCycleId: "cycle-rec-1",
+          accepted: true,
+          evaluationScore: 0,
+          occurredAt: 22,
+        },
+      },
+    ]);
+
+    const { ws } = await harness.openClient();
+    const recursionP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-recursion",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-recursion",
+        method: "prometheus.recursion",
+        params: {
+          recursionWindowSize: 2,
+        },
+      }),
+    );
+    const response = (await recursionP) as {
+      ok?: boolean;
+      payload?: {
+        windowSize?: number;
+        totals?: {
+          totalCycles?: number;
+          rollbackCount?: number;
+        };
+        cycles?: Array<{ cycleId?: string; rollbackOfCycleId?: string }>;
+      };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.windowSize).toBe(2);
+    expect(response.payload?.totals?.totalCycles).toBeGreaterThanOrEqual(2);
+    expect(response.payload?.totals?.rollbackCount).toBe(1);
+    expect(response.payload?.cycles?.[0]?.cycleId).toBe("cycle-rec-2");
+    expect(response.payload?.cycles?.[0]?.rollbackOfCycleId).toBe("cycle-rec-1");
+    ws.close();
+  });
 });

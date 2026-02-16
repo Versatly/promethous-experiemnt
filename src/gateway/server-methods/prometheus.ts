@@ -43,6 +43,14 @@ function resolveTrajectoryWindowSize(params: Record<string, unknown>): number {
   return Math.max(2, Math.floor(raw));
 }
 
+function resolveRecursionWindowSize(params: Record<string, unknown>): number {
+  const raw = params.recursionWindowSize;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return 10;
+  }
+  return Math.max(1, Math.floor(raw));
+}
+
 export const prometheusHandlers: GatewayRequestHandlers = {
   "prometheus.status": async ({ respond, params }) => {
     try {
@@ -143,6 +151,55 @@ export const prometheusHandlers: GatewayRequestHandlers = {
           ts: Date.now(),
           total: goals.length,
           goals,
+        },
+        undefined,
+      );
+    } catch (error) {
+      respond(false, undefined, errorShape(ErrorCodes.INTERNAL_ERROR, formatForLog(error)));
+    }
+  },
+  "prometheus.recursion": async ({ respond, params }) => {
+    try {
+      const stateDir = resolveObserverStateDir(params);
+      const eventStore = createFilePrometheusEventStore(
+        path.join(stateDir, "prometheus", "events.jsonl"),
+      );
+      const events = await eventStore.readAll();
+      const state = replayPrometheusEvents(events);
+      const recursionWindowSize = resolveRecursionWindowSize(params);
+      const cycles = state.recursionCycles
+        .slice(-recursionWindowSize)
+        .toReversed()
+        .map((cycle) => ({
+          cycleId: cycle.cycleId,
+          occurredAt: cycle.occurredAt,
+          summary: cycle.summary,
+          mutationId: cycle.mutationId,
+          accepted: cycle.accepted,
+          evaluationScore: cycle.evaluationScore,
+          rollbackOfCycleId: cycle.rollbackOfCycleId,
+          rationale: cycle.rationale,
+        }));
+      const accepted = cycles.filter((cycle) => cycle.accepted === true).length;
+      const rejected = cycles.filter((cycle) => cycle.accepted === false).length;
+      const rollbackCount = cycles.filter(
+        (cycle) => typeof cycle.rollbackOfCycleId === "string",
+      ).length;
+      const acceptanceRatio = cycles.length === 0 ? 0 : accepted / cycles.length;
+
+      respond(
+        true,
+        {
+          ts: Date.now(),
+          windowSize: recursionWindowSize,
+          totals: {
+            totalCycles: state.recursionCycles.length,
+            accepted,
+            rejected,
+            rollbackCount,
+            acceptanceRatio,
+          },
+          cycles,
         },
         undefined,
       );
