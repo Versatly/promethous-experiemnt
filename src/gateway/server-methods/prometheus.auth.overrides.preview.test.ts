@@ -51,6 +51,123 @@ describe("PROMETHEUS gateway authorization override regressions (control preview
     expect(buildControlCatalogSnapshot).not.toHaveBeenCalled();
   });
 
+  it("invokes planned-action resolvers once for planned action request path", async () => {
+    const action = "autarch.gap-detection.commit";
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingPreviewActionPreflight({
+      action,
+      metadata,
+    });
+    const resolvePlannedActionMetadata = vi.fn((requestedAction: string) =>
+      getPrometheusPlannedMutatingPreviewActionMetadata(requestedAction),
+    );
+    const resolvePlannedActionPreflight = vi.fn((requestedAction: string) => {
+      const requestedMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(requestedAction);
+      if (!requestedMetadata) {
+        return undefined;
+      }
+      return buildPrometheusPlannedMutatingPreviewActionPreflight({
+        action: requestedAction,
+        metadata: requestedMetadata,
+      });
+    });
+
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-action-resolver-invocation-scope-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action,
+          goalId: "goal-1",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: (params, deps) =>
+          runPrometheusControlPreview(params, {
+            ...deps,
+            resolvePlannedActionMetadata,
+            resolvePlannedActionPreflight,
+          }),
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+    expect(resolvePlannedActionMetadata).toHaveBeenCalledTimes(1);
+    expect(resolvePlannedActionPreflight).toHaveBeenCalledTimes(1);
+    expect(resolvePlannedActionMetadata).toHaveBeenCalledWith(action);
+    expect(resolvePlannedActionPreflight).toHaveBeenCalledWith(action);
+  });
+
+  it("does not invoke planned-action resolvers for active non-planned action request path", async () => {
+    const resolvePlannedActionMetadata = vi.fn(() => {
+      throw new Error("planned-action metadata resolver should not be called");
+    });
+    const resolvePlannedActionPreflight = vi.fn(() => {
+      throw new Error("planned-action preflight resolver should not be called");
+    });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "active-action-resolver-short-circuit-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: (params, deps) =>
+          runPrometheusControlPreview(params, {
+            ...deps,
+            resolvePlannedActionMetadata,
+            resolvePlannedActionPreflight,
+          }),
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        action: "autarch.gap-detection",
+        mutatesState: false,
+      }),
+      undefined,
+    );
+    expect(resolvePlannedActionMetadata).not.toHaveBeenCalled();
+    expect(resolvePlannedActionPreflight).not.toHaveBeenCalled();
+  });
+
   it("returns UNAVAILABLE when injected preview dependency violates bounded AUTARCH invariants at request level", async () => {
     const respond = vi.fn();
     await handleGatewayRequest({
