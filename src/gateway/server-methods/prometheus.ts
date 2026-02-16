@@ -38,6 +38,8 @@ import {
   resolveTrajectoryWindowSize,
 } from "./prometheus.params.js";
 
+const PROMETHEUS_VALID_ERROR_CODES = new Set(Object.values(ErrorCodes));
+
 export function assertPrometheusHandlerContract(args: {
   handlers: GatewayRequestHandlers;
   methodMetadata: Record<string, PrometheusGatewayMethodMetadata>;
@@ -94,6 +96,7 @@ function isPrometheusControlPreviewResult(value: unknown): value is PrometheusCo
       !!candidate.error &&
       typeof candidate.error === "object" &&
       typeof candidate.error.code === "string" &&
+      PROMETHEUS_VALID_ERROR_CODES.has(candidate.error.code) &&
       typeof candidate.error.message === "string"
     );
   }

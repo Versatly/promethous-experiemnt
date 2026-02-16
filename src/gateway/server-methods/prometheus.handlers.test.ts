@@ -1118,6 +1118,43 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
     );
   });
 
+  it("returns UNAVAILABLE when injected control preview error code is invalid", async () => {
+    const handlers = createPrometheusHandlers({
+      runControlPreview: async () =>
+        ({
+          ok: false,
+          error: {
+            code: "BOOM",
+            message: "unexpected",
+          },
+        }) as never,
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "control-preview-invalid-error-code",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
+
   it("does not mutate event log across preview actions", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
     const eventStore = createFilePrometheusEventStore(
