@@ -100,6 +100,33 @@ describe("PROMETHEUS mutating-control guard", () => {
     );
   });
 
+  it("falls back to metadata when planned preflight resolver is missing", () => {
+    const metadata = {
+      access: "write" as const,
+      mutatesState: true as const,
+      enabled: false as const,
+      enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+      requiredParams: ["action"],
+      reason: "planned rollout",
+    };
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({
+      method: "prometheus.control.execute",
+      metadata,
+    });
+    const error = getPrometheusPlannedMutatingMethodGuardError({
+      method: "prometheus.control.execute",
+      env: {},
+      resolvePlannedMethodPreflight: () => undefined,
+      resolvePlannedMethodMetadata: () => metadata,
+    });
+    expect(error).toEqual(
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
+
   it("does not block methods outside planned mutating metadata", () => {
     const error = getPrometheusPlannedMutatingMethodGuardError({
       method: "prometheus.status",

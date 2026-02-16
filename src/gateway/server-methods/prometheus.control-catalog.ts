@@ -79,9 +79,29 @@ export type PrometheusControlCatalogSnapshot = {
 export function buildPrometheusControlCatalogSnapshot(args?: {
   env?: NodeJS.ProcessEnv;
   now?: number;
+  resolvePlannedMethodMetadata?: (
+    method: string,
+  ) => ReturnType<typeof getPrometheusPlannedMutatingMethodMetadata>;
+  resolvePlannedMethodPreflight?: (
+    method: string,
+  ) => ReturnType<typeof getPrometheusPlannedMutatingMethodPreflight>;
+  resolvePlannedActionMetadata?: (
+    action: string,
+  ) => ReturnType<typeof getPrometheusPlannedMutatingPreviewActionMetadata>;
+  resolvePlannedActionPreflight?: (
+    action: string,
+  ) => ReturnType<typeof getPrometheusPlannedMutatingPreviewActionPreflight>;
 }): PrometheusControlCatalogSnapshot {
   const env = args?.env ?? process.env;
   const now = args?.now ?? Date.now();
+  const resolvePlannedMethodMetadata =
+    args?.resolvePlannedMethodMetadata ?? getPrometheusPlannedMutatingMethodMetadata;
+  const resolvePlannedMethodPreflight =
+    args?.resolvePlannedMethodPreflight ?? getPrometheusPlannedMutatingMethodPreflight;
+  const resolvePlannedActionMetadata =
+    args?.resolvePlannedActionMetadata ?? getPrometheusPlannedMutatingPreviewActionMetadata;
+  const resolvePlannedActionPreflight =
+    args?.resolvePlannedActionPreflight ?? getPrometheusPlannedMutatingPreviewActionPreflight;
 
   const methods = Object.entries(PROMETHEUS_GATEWAY_METHOD_METADATA)
     .toSorted(([left], [right]) => left.localeCompare(right))
@@ -119,11 +139,11 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
       mutatingMethods,
       mutatingPreviewActions,
       plannedMutatingMethods: plannedMutatingMethods.map((method) => {
-        const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+        const metadata = resolvePlannedMethodMetadata(method);
         if (!metadata) {
           throw new Error(`Missing planned mutating method metadata for "${method}"`);
         }
-        const preflight = getPrometheusPlannedMutatingMethodPreflight(method);
+        const preflight = resolvePlannedMethodPreflight(method);
         if (!preflight) {
           throw new Error(`Missing planned mutating method preflight for "${method}"`);
         }
@@ -134,11 +154,11 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
         };
       }),
       plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => {
-        const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+        const metadata = resolvePlannedActionMetadata(action);
         if (!metadata) {
           throw new Error(`Missing planned mutating action metadata for "${action}"`);
         }
-        const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(action);
+        const preflight = resolvePlannedActionPreflight(action);
         if (!preflight) {
           throw new Error(`Missing planned mutating action preflight for "${action}"`);
         }
