@@ -46,6 +46,7 @@ import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js
 import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { getTotalQueueSize } from "../process/command-queue.js";
+import { startPrometheusRuntimeObserver } from "../prometheus/runtime-observer.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { createAuthRateLimiter, type AuthRateLimiter } from "./auth-rate-limit.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
@@ -494,6 +495,11 @@ export async function startGatewayServer(
     : onHeartbeatEvent((evt) => {
         broadcast("heartbeat", evt, { dropIfSlow: true });
       });
+  const prometheusObserver = minimalTestGateway
+    ? null
+    : startPrometheusRuntimeObserver({
+        logger: log.child("prometheus-observer"),
+      });
 
   let heartbeatRunner: HeartbeatRunner = minimalTestGateway
     ? {
@@ -718,6 +724,7 @@ export async function startGatewayServer(
         clearTimeout(skillsRefreshTimer);
         skillsRefreshTimer = null;
       }
+      prometheusObserver?.stop();
       skillsChangeUnsub();
       authRateLimiter?.dispose();
       await close(opts);

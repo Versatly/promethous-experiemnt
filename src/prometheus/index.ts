@@ -6,5 +6,6 @@ export * from "./helios/evaluator.js";
 export * from "./helios/trajectory.js";
 export * from "./helios/trajectory-store.js";
 export * from "./invariants.js";
+export * from "./runtime-observer.js";
 export * from "./state.js";
 export * from "./types.js";
