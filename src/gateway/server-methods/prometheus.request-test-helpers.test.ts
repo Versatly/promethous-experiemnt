@@ -5,6 +5,7 @@ import {
   runPrometheusNodeRequest,
   runPrometheusOperatorRequest,
   runPrometheusReadRequest,
+  runPrometheusRoleRequest,
   runPrometheusWriteRequest,
 } from "./prometheus.request-test-helpers.js";
 
@@ -71,6 +72,27 @@ describe("prometheus request test helpers", () => {
       undefined,
       expect.objectContaining({
         message: expect.stringContaining("unauthorized role: node"),
+      }),
+    );
+  });
+
+  it("uses custom-role defaults for role helper requests", async () => {
+    const respond = vi.fn();
+    await runPrometheusRoleRequest({
+      role: "auditor",
+      request: {
+        id: "request-helper-custom-role-defaults",
+        method: "prometheus.status",
+        params: {},
+      },
+      respond,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: auditor"),
       }),
     );
   });
@@ -294,6 +316,34 @@ describe("prometheus request test helpers", () => {
     expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
   });
 
+  it("does not invoke extra handlers for custom roles denied before dispatch", async () => {
+    const statusHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const respond = vi.fn();
+    await runPrometheusRoleRequest({
+      role: "auditor",
+      request: {
+        id: "request-helper-custom-role-short-circuit-before-handler",
+        method: "prometheus.status",
+        params: {},
+      },
+      respond,
+      extraHandlers: {
+        "prometheus.status": statusHandler,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: auditor"),
+      }),
+    );
+    expect(statusHandler).not.toHaveBeenCalled();
+  });
+
   it("throws descriptive error when operator helper request method is blank", async () => {
     await expect(
       runPrometheusOperatorRequest({
@@ -338,6 +388,20 @@ describe("prometheus request test helpers", () => {
       runPrometheusNodeRequest({
         request: {
           id: "request-helper-invalid-blank-method-node",
+          method: "",
+          params: {},
+        },
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
+  });
+
+  it("throws descriptive error when custom-role helper request method is blank", async () => {
+    await expect(
+      runPrometheusRoleRequest({
+        role: "auditor",
+        request: {
+          id: "request-helper-invalid-blank-method-custom-role",
           method: "",
           params: {},
         },

@@ -13,7 +13,7 @@ type PrometheusOperatorRequestArgs = {
 };
 
 type PrometheusScopedRequestArgs = PrometheusOperatorRequestArgs & {
-  role?: "operator" | "node";
+  role?: string;
 };
 
 function resolveRequestMethod(request: PrometheusOperatorRequestArgs["request"]): string {
@@ -71,6 +71,16 @@ export async function runPrometheusNodeRequest(
   await runPrometheusScopedRequest({
     ...args,
     role: "node",
+    scopes: args.scopes ?? ["operator.read"],
+  });
+}
+
+export async function runPrometheusRoleRequest(
+  args: Omit<PrometheusOperatorRequestArgs, "scopes"> & { role: string; scopes?: string[] },
+) {
+  await runPrometheusScopedRequest({
+    ...args,
+    role: args.role,
     scopes: args.scopes ?? ["operator.read"],
   });
 }

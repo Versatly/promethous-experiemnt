@@ -15,6 +15,7 @@ import {
   runPrometheusNodeRequest,
   runPrometheusOperatorRequest,
   runPrometheusReadRequest,
+  runPrometheusRoleRequest,
 } from "./prometheus.request-test-helpers.js";
 
 afterEach(() => {
@@ -96,6 +97,52 @@ describe("PROMETHEUS gateway authorization override invocation scope", () => {
       undefined,
       expect.objectContaining({
         message: expect.stringContaining("unauthorized role: node"),
+      }),
+    );
+    expect(plannedExecuteHandler).not.toHaveBeenCalled();
+    expect(resolvePrometheusMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodMetadata).not.toHaveBeenCalled();
+    expect(resolvePrometheusPlannedMethodPreflight).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch extra handlers when non-operator/non-node role is denied", async () => {
+    const method = "prometheus.control.execute";
+    const plannedExecuteHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const resolvePrometheusMethodMetadata = vi.fn(() => {
+      throw new Error("method metadata resolver should not be called for non-operator role");
+    });
+    const resolvePrometheusPlannedMethodMetadata = vi.fn(() => {
+      throw new Error("planned metadata resolver should not be called for non-operator role");
+    });
+    const resolvePrometheusPlannedMethodPreflight = vi.fn(() => {
+      throw new Error("planned preflight resolver should not be called for non-operator role");
+    });
+    const respond = vi.fn();
+    await runPrometheusRoleRequest({
+      role: "auditor",
+      request: {
+        id: "non-operator-role-planned-method-extra-handler-short-circuit",
+        method,
+        params: {},
+      },
+      respond,
+      authOverrides: {
+        resolvePrometheusMethodMetadata,
+        resolvePrometheusPlannedMethodMetadata,
+        resolvePrometheusPlannedMethodPreflight,
+      },
+      extraHandlers: {
+        [method]: plannedExecuteHandler,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: auditor"),
       }),
     );
     expect(plannedExecuteHandler).not.toHaveBeenCalled();
