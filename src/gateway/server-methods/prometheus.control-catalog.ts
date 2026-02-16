@@ -101,6 +101,23 @@ function isPrometheusPlannedMethodMetadataShape(
   );
 }
 
+function isPrometheusPlannedMethodMetadataEquivalent(
+  left: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingMethodMetadata>>,
+  right: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingMethodMetadata>>,
+): boolean {
+  return (
+    left.access === right.access &&
+    left.mutatesState === right.mutatesState &&
+    left.enabled === right.enabled &&
+    left.enableEnvVar === right.enableEnvVar &&
+    left.reason === right.reason &&
+    left.requiredParams.length === right.requiredParams.length &&
+    left.requiredParams.every(
+      (requiredParam, index) => requiredParam === right.requiredParams[index],
+    )
+  );
+}
+
 function isPrometheusPlannedMethodPreflightShape(
   value: unknown,
 ): value is NonNullable<ReturnType<typeof getPrometheusPlannedMutatingMethodPreflight>> {
@@ -114,6 +131,17 @@ function isPrometheusPlannedMethodPreflightShape(
     typeof candidate.disabledMessage === "string" &&
     typeof candidate.notImplementedMessage === "string" &&
     typeof candidate.requiredParamsMessage === "string"
+  );
+}
+
+function isPrometheusPlannedMethodPreflightEquivalent(
+  left: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingMethodPreflight>>,
+  right: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingMethodPreflight>>,
+): boolean {
+  return (
+    left.disabledMessage === right.disabledMessage &&
+    left.notImplementedMessage === right.notImplementedMessage &&
+    left.requiredParamsMessage === right.requiredParamsMessage
   );
 }
 
@@ -136,6 +164,22 @@ function isPrometheusPlannedActionMetadataShape(
   );
 }
 
+function isPrometheusPlannedActionMetadataEquivalent(
+  left: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingPreviewActionMetadata>>,
+  right: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingPreviewActionMetadata>>,
+): boolean {
+  return (
+    left.mutatesState === right.mutatesState &&
+    left.enabled === right.enabled &&
+    left.enableEnvVar === right.enableEnvVar &&
+    left.reason === right.reason &&
+    left.requiredParams.length === right.requiredParams.length &&
+    left.requiredParams.every(
+      (requiredParam, index) => requiredParam === right.requiredParams[index],
+    )
+  );
+}
+
 function isPrometheusPlannedActionPreflightShape(
   value: unknown,
 ): value is NonNullable<ReturnType<typeof getPrometheusPlannedMutatingPreviewActionPreflight>> {
@@ -149,6 +193,17 @@ function isPrometheusPlannedActionPreflightShape(
     typeof candidate.disabledMessage === "string" &&
     typeof candidate.notImplementedMessage === "string" &&
     typeof candidate.requiredParamsMessage === "string"
+  );
+}
+
+function isPrometheusPlannedActionPreflightEquivalent(
+  left: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingPreviewActionPreflight>>,
+  right: NonNullable<ReturnType<typeof getPrometheusPlannedMutatingPreviewActionPreflight>>,
+): boolean {
+  return (
+    left.disabledMessage === right.disabledMessage &&
+    left.notImplementedMessage === right.notImplementedMessage &&
+    left.requiredParamsMessage === right.requiredParamsMessage
   );
 }
 
@@ -215,50 +270,78 @@ export function buildPrometheusControlCatalogSnapshot(args?: {
       mutatingMethods,
       mutatingPreviewActions,
       plannedMutatingMethods: plannedMutatingMethods.map((method) => {
+        const canonicalMetadata = getPrometheusPlannedMutatingMethodMetadata(method);
+        const canonicalPreflight = getPrometheusPlannedMutatingMethodPreflight(method);
         const metadata = resolvePlannedMethodMetadata(method);
         const validatedMetadata = isPrometheusPlannedMethodMetadataShape(metadata)
           ? metadata
           : undefined;
+        const effectiveMetadata =
+          canonicalMetadata && validatedMetadata
+            ? isPrometheusPlannedMethodMetadataEquivalent(validatedMetadata, canonicalMetadata)
+              ? validatedMetadata
+              : canonicalMetadata
+            : (validatedMetadata ?? canonicalMetadata);
         const resolvedPreflight = resolvePlannedMethodPreflight(method);
         const validatedPreflight = isPrometheusPlannedMethodPreflightShape(resolvedPreflight)
           ? resolvedPreflight
           : undefined;
-        if (!validatedMetadata) {
+        const effectivePreflight =
+          canonicalPreflight && validatedPreflight
+            ? isPrometheusPlannedMethodPreflightEquivalent(validatedPreflight, canonicalPreflight)
+              ? validatedPreflight
+              : canonicalPreflight
+            : (validatedPreflight ?? canonicalPreflight);
+        if (!effectiveMetadata) {
           throw new Error(`Missing planned mutating method metadata for "${method}"`);
         }
         const preflight =
-          validatedPreflight ??
+          effectivePreflight ??
           buildPrometheusPlannedMutatingMethodPreflight({
             method,
-            metadata: validatedMetadata,
+            metadata: effectiveMetadata,
           });
         return {
           method,
-          ...validatedMetadata,
+          ...effectiveMetadata,
           preflight,
         };
       }),
       plannedMutatingPreviewActions: plannedMutatingPreviewActions.map((action) => {
+        const canonicalMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
+        const canonicalPreflight = getPrometheusPlannedMutatingPreviewActionPreflight(action);
         const metadata = resolvePlannedActionMetadata(action);
         const validatedMetadata = isPrometheusPlannedActionMetadataShape(metadata)
           ? metadata
           : undefined;
+        const effectiveMetadata =
+          canonicalMetadata && validatedMetadata
+            ? isPrometheusPlannedActionMetadataEquivalent(validatedMetadata, canonicalMetadata)
+              ? validatedMetadata
+              : canonicalMetadata
+            : (validatedMetadata ?? canonicalMetadata);
         const resolvedPreflight = resolvePlannedActionPreflight(action);
         const validatedPreflight = isPrometheusPlannedActionPreflightShape(resolvedPreflight)
           ? resolvedPreflight
           : undefined;
-        if (!validatedMetadata) {
+        const effectivePreflight =
+          canonicalPreflight && validatedPreflight
+            ? isPrometheusPlannedActionPreflightEquivalent(validatedPreflight, canonicalPreflight)
+              ? validatedPreflight
+              : canonicalPreflight
+            : (validatedPreflight ?? canonicalPreflight);
+        if (!effectiveMetadata) {
           throw new Error(`Missing planned mutating action metadata for "${action}"`);
         }
         const preflight =
-          validatedPreflight ??
+          effectivePreflight ??
           buildPrometheusPlannedMutatingPreviewActionPreflight({
             action,
-            metadata: validatedMetadata,
+            metadata: effectiveMetadata,
           });
         return {
           action,
-          ...validatedMetadata,
+          ...effectiveMetadata,
           preflight,
         };
       }),

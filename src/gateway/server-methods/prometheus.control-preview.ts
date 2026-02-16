@@ -314,6 +314,22 @@ function isPrometheusPlannedMutatingPreviewActionMetadataShape(
   );
 }
 
+function isPrometheusPlannedMutatingPreviewActionMetadataEquivalent(
+  left: PrometheusPlannedMutatingPreviewActionMetadata,
+  right: PrometheusPlannedMutatingPreviewActionMetadata,
+): boolean {
+  return (
+    left.mutatesState === right.mutatesState &&
+    left.enabled === right.enabled &&
+    left.enableEnvVar === right.enableEnvVar &&
+    left.reason === right.reason &&
+    left.requiredParams.length === right.requiredParams.length &&
+    left.requiredParams.every(
+      (requiredParam, index) => requiredParam === right.requiredParams[index],
+    )
+  );
+}
+
 function isPrometheusPlannedMutatingPreviewActionPreflightShape(
   value: unknown,
 ): value is PrometheusPlannedMutatingPreviewActionPreflight {
@@ -325,6 +341,17 @@ function isPrometheusPlannedMutatingPreviewActionPreflightShape(
     typeof candidate.disabledMessage === "string" &&
     typeof candidate.notImplementedMessage === "string" &&
     typeof candidate.requiredParamsMessage === "string"
+  );
+}
+
+function isPrometheusPlannedMutatingPreviewActionPreflightEquivalent(
+  left: PrometheusPlannedMutatingPreviewActionPreflight,
+  right: PrometheusPlannedMutatingPreviewActionPreflight,
+): boolean {
+  return (
+    left.disabledMessage === right.disabledMessage &&
+    left.notImplementedMessage === right.notImplementedMessage &&
+    left.requiredParamsMessage === right.requiredParamsMessage
   );
 }
 
@@ -399,14 +426,36 @@ export async function runPrometheusControlPreview(
     const resolvePlannedActionMetadataRaw =
       deps?.resolvePlannedActionMetadata ?? getPrometheusPlannedMutatingPreviewActionMetadata;
     const resolvePlannedActionPreflight = (action: string) => {
+      const canonicalPreflight = getPrometheusPlannedMutatingPreviewActionPreflight(action);
       const preflight = resolvePlannedActionPreflightRaw(action);
-      return isPrometheusPlannedMutatingPreviewActionPreflightShape(preflight)
+      const validatedPreflight = isPrometheusPlannedMutatingPreviewActionPreflightShape(preflight)
         ? preflight
         : undefined;
+      if (canonicalPreflight && validatedPreflight) {
+        return isPrometheusPlannedMutatingPreviewActionPreflightEquivalent(
+          validatedPreflight,
+          canonicalPreflight,
+        )
+          ? validatedPreflight
+          : canonicalPreflight;
+      }
+      return validatedPreflight ?? canonicalPreflight;
     };
     const resolvePlannedActionMetadata = (action: string) => {
+      const canonicalMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(action);
       const metadata = resolvePlannedActionMetadataRaw(action);
-      return isPrometheusPlannedMutatingPreviewActionMetadataShape(metadata) ? metadata : undefined;
+      const validatedMetadata = isPrometheusPlannedMutatingPreviewActionMetadataShape(metadata)
+        ? metadata
+        : undefined;
+      if (canonicalMetadata && validatedMetadata) {
+        return isPrometheusPlannedMutatingPreviewActionMetadataEquivalent(
+          validatedMetadata,
+          canonicalMetadata,
+        )
+          ? validatedMetadata
+          : canonicalMetadata;
+      }
+      return validatedMetadata ?? canonicalMetadata;
     };
     const rawAction =
       typeof params.action === "string" && params.action.trim().length > 0

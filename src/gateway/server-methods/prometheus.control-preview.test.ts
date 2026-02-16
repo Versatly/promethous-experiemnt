@@ -440,6 +440,36 @@ describe("prometheus control preview helpers", () => {
     });
   });
 
+  it("falls back to canonical preflight when planned-action resolver returns divergent valid preflight", async () => {
+    const canonicalPreflight = getPrometheusPlannedMutatingPreviewActionPreflight(
+      "autarch.gap-detection.commit",
+    );
+    expect(canonicalPreflight).toBeDefined();
+    if (!canonicalPreflight) {
+      return;
+    }
+    const result = await runPrometheusControlPreview(
+      {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-1",
+      },
+      {
+        resolvePlannedActionPreflight: () => ({
+          disabledMessage: "DIVERGENT disabled message",
+          notImplementedMessage: "DIVERGENT not implemented message",
+          requiredParamsMessage: "DIVERGENT required params message",
+        }),
+      },
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: canonicalPreflight.disabledMessage,
+      },
+    });
+  });
+
   it("returns UNAVAILABLE when planned-action metadata resolver returns malformed object", async () => {
     const preflight = getPrometheusPlannedMutatingPreviewActionPreflight(
       "autarch.gap-detection.commit",

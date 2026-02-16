@@ -131,14 +131,25 @@ describe("prometheus control catalog builder", () => {
     );
   });
 
-  it("fails fast when planned mutating method metadata lookup misses known entries", () => {
+  it("falls back to canonical metadata when planned mutating method metadata lookup misses known entries", () => {
     const plannedMethod = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted()[0]!;
-    expect(() =>
-      buildPrometheusControlCatalogSnapshot({
-        env: {},
-        resolvePlannedMethodMetadata: () => undefined,
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(plannedMethod);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedMethodMetadata: () => undefined,
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.find((method) => method.method === plannedMethod),
+    ).toEqual(
+      expect.objectContaining({
+        reason: metadata.reason,
+        requiredParams: metadata.requiredParams,
       }),
-    ).toThrow(`Missing planned mutating method metadata for "${plannedMethod}"`);
+    );
   });
 
   it("falls back when planned mutating method preflight lookup misses known entries", () => {
@@ -188,16 +199,83 @@ describe("prometheus control catalog builder", () => {
     );
   });
 
-  it("fails fast when planned mutating action metadata lookup misses known entries", () => {
+  it("falls back to canonical preflight when planned mutating method preflight lookup diverges", () => {
+    const plannedMethod = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted()[0]!;
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(plannedMethod);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedMethodPreflight: () => ({
+        disabledMessage: "DIVERGENT disabled message",
+        notImplementedMessage: "DIVERGENT not implemented message",
+        requiredParamsMessage: "DIVERGENT required params message",
+      }),
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.find((method) => method.method === plannedMethod)
+        ?.preflight,
+    ).toEqual(
+      buildPrometheusPlannedMutatingMethodPreflight({
+        method: plannedMethod,
+        metadata,
+      }),
+    );
+  });
+
+  it("falls back to canonical metadata when planned mutating action metadata lookup misses known entries", () => {
     const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
       .toSorted()
       .at(0)!;
-    expect(() =>
-      buildPrometheusControlCatalogSnapshot({
-        env: {},
-        resolvePlannedActionMetadata: () => undefined,
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(plannedAction);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedActionMetadata: () => undefined,
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.find(
+        (action) => action.action === plannedAction,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        reason: metadata.reason,
+        requiredParams: metadata.requiredParams,
       }),
-    ).toThrow(`Missing planned mutating action metadata for "${plannedAction}"`);
+    );
+  });
+
+  it("falls back to canonical metadata when planned mutating method metadata lookup diverges", () => {
+    const plannedMethod = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA).toSorted()[0]!;
+    const canonicalMetadata = getPrometheusPlannedMutatingMethodMetadata(plannedMethod);
+    expect(canonicalMetadata).toBeDefined();
+    if (!canonicalMetadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedMethodMetadata: () => ({
+        access: "write",
+        mutatesState: true,
+        enabled: false,
+        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        requiredParams: [...canonicalMetadata.requiredParams],
+        reason: "DIVERGENT reason",
+      }),
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingMethods.find((method) => method.method === plannedMethod),
+    ).toEqual(
+      expect.objectContaining({
+        reason: canonicalMetadata.reason,
+        requiredParams: canonicalMetadata.requiredParams,
+      }),
+    );
   });
 
   it("falls back when planned mutating action preflight lookup misses known entries", () => {
@@ -253,22 +331,95 @@ describe("prometheus control catalog builder", () => {
     );
   });
 
-  it("fails fast when planned mutating action metadata resolver returns malformed object", () => {
+  it("falls back to canonical preflight when planned mutating action preflight lookup diverges", () => {
     const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
       .toSorted()
       .at(0)!;
-    expect(() =>
-      buildPrometheusControlCatalogSnapshot({
-        env: {},
-        resolvePlannedActionMetadata: () =>
-          ({
-            mutatesState: true,
-            enabled: false,
-            enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
-            requiredParams: ["goalId", "goalId"],
-            reason: "invalid required params",
-          }) as never,
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(plannedAction);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedActionPreflight: () => ({
+        disabledMessage: "DIVERGENT disabled message",
+        notImplementedMessage: "DIVERGENT not implemented message",
+        requiredParamsMessage: "DIVERGENT required params message",
       }),
-    ).toThrow(`Missing planned mutating action metadata for "${plannedAction}"`);
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.find(
+        (action) => action.action === plannedAction,
+      )?.preflight,
+    ).toEqual(
+      buildPrometheusPlannedMutatingPreviewActionPreflight({
+        action: plannedAction,
+        metadata,
+      }),
+    );
+  });
+
+  it("falls back to canonical metadata when planned mutating action metadata resolver returns malformed object", () => {
+    const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
+      .toSorted()
+      .at(0)!;
+    const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(plannedAction);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedActionMetadata: () =>
+        ({
+          mutatesState: true,
+          enabled: false,
+          enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+          requiredParams: ["goalId", "goalId"],
+          reason: "invalid required params",
+        }) as never,
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.find(
+        (action) => action.action === plannedAction,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        reason: metadata.reason,
+        requiredParams: metadata.requiredParams,
+      }),
+    );
+  });
+
+  it("falls back to canonical metadata when planned mutating action metadata lookup diverges", () => {
+    const plannedAction = Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)
+      .toSorted()
+      .at(0)!;
+    const canonicalMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(plannedAction);
+    expect(canonicalMetadata).toBeDefined();
+    if (!canonicalMetadata) {
+      return;
+    }
+    const snapshot = buildPrometheusControlCatalogSnapshot({
+      env: {},
+      resolvePlannedActionMetadata: () => ({
+        mutatesState: true,
+        enabled: false,
+        enableEnvVar: PROMETHEUS_MUTATING_CONTROLS_ENV,
+        requiredParams: [...canonicalMetadata.requiredParams],
+        reason: "DIVERGENT reason",
+      }),
+    });
+    expect(
+      snapshot.guardrails.plannedMutatingPreviewActions.find(
+        (action) => action.action === plannedAction,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        reason: canonicalMetadata.reason,
+        requiredParams: canonicalMetadata.requiredParams,
+      }),
+    );
   });
 });
