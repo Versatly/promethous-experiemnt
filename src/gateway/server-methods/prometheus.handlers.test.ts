@@ -635,6 +635,14 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
     expect(respond).toHaveBeenCalledWith(
       true,
       expect.objectContaining({
+        summary: expect.objectContaining({
+          totalMethods: expect.any(Number),
+          readMethods: expect.any(Number),
+          writeMethods: expect.any(Number),
+          mutatingMethods: 0,
+          previewActions: 3,
+          mutatingPreviewActions: 0,
+        }),
         methods: expect.arrayContaining([
           expect.objectContaining({
             method: "prometheus.control.catalog",

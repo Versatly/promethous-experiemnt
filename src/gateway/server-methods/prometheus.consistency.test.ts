@@ -231,6 +231,14 @@ describe("prometheus adapter summary consistency", () => {
 
     expect(respond).toHaveBeenCalledWith(true, expect.any(Object), undefined);
     const payload = respond.mock.calls[0]?.[1] as {
+      summary: {
+        totalMethods: number;
+        readMethods: number;
+        writeMethods: number;
+        mutatingMethods: number;
+        previewActions: number;
+        mutatingPreviewActions: number;
+      };
       methods: Array<{ method: string; access: string; mutatesState: boolean }>;
       controlPreview: {
         method: string;
@@ -253,6 +261,15 @@ describe("prometheus adapter summary consistency", () => {
     expect(methodMapFromCatalog).toEqual(PROMETHEUS_GATEWAY_METHOD_METADATA);
     expect(payload.controlPreview.method).toBe("prometheus.control.preview");
     expect(payload.controlPreview.actions).toHaveLength(PROMETHEUS_CONTROL_PREVIEW_ACTIONS.length);
+    expect(payload.summary.totalMethods).toBe(payload.methods.length);
+    expect(payload.summary.readMethods + payload.summary.writeMethods).toBe(payload.methods.length);
+    expect(payload.summary.mutatingMethods).toBe(
+      payload.methods.filter((method) => method.mutatesState).length,
+    );
+    expect(payload.summary.previewActions).toBe(payload.controlPreview.actions.length);
+    expect(payload.summary.mutatingPreviewActions).toBe(
+      payload.controlPreview.actions.filter((action) => action.mutatesState).length,
+    );
 
     for (const action of PROMETHEUS_CONTROL_PREVIEW_ACTIONS) {
       expect(payload.controlPreview.actions).toContainEqual(

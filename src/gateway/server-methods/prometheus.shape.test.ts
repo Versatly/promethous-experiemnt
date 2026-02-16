@@ -173,7 +173,12 @@ describe("prometheus handlers response shape", () => {
       "summary",
       "ts",
     ]);
-    expect(payloadTopKeys(controlCatalogPayload)).toEqual(["controlPreview", "methods", "ts"]);
+    expect(payloadTopKeys(controlCatalogPayload)).toEqual([
+      "controlPreview",
+      "methods",
+      "summary",
+      "ts",
+    ]);
     expect(payloadTopKeys(controlPreviewPayload)).toEqual([
       "action",
       "mutatesState",

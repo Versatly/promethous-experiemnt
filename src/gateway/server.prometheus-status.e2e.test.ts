@@ -682,6 +682,14 @@ describe("gateway prometheus.status", () => {
     const response = (await responseP) as {
       ok?: boolean;
       payload?: {
+        summary?: {
+          totalMethods?: number;
+          readMethods?: number;
+          writeMethods?: number;
+          mutatingMethods?: number;
+          previewActions?: number;
+          mutatingPreviewActions?: number;
+        };
         methods?: Array<{ method?: string; access?: string; mutatesState?: boolean }>;
         controlPreview?: {
           method?: string;
@@ -724,6 +732,16 @@ describe("gateway prometheus.status", () => {
           mutatesState: false,
         }),
       ]),
+    );
+    expect(response.payload?.summary).toEqual(
+      expect.objectContaining({
+        totalMethods: expect.any(Number),
+        readMethods: expect.any(Number),
+        writeMethods: expect.any(Number),
+        mutatingMethods: 0,
+        previewActions: 3,
+        mutatingPreviewActions: 0,
+      }),
     );
     expect(response.error).toBeUndefined();
     ws.close();

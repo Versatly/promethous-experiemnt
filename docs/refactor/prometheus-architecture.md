@@ -100,6 +100,7 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `snapshots`
 - `prometheus.control.catalog`:
   - `ts`
+  - `summary`
   - `methods`
   - `controlPreview`
 - `prometheus.goals`:

@@ -390,10 +390,19 @@ export const prometheusHandlers: GatewayRequestHandlers = {
         action,
         ...PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action],
       }));
+      const summary = {
+        totalMethods: methods.length,
+        readMethods: methods.filter((method) => method.access === "read").length,
+        writeMethods: methods.filter((method) => method.access === "write").length,
+        mutatingMethods: methods.filter((method) => method.mutatesState).length,
+        previewActions: actions.length,
+        mutatingPreviewActions: actions.filter((action) => action.mutatesState).length,
+      };
       respond(
         true,
         {
           ts: Date.now(),
+          summary,
           methods,
           controlPreview: {
             method: "prometheus.control.preview",
