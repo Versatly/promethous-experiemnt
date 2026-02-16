@@ -69,6 +69,18 @@ describe("prometheus contract guards", () => {
     expect(isPrometheusControlCatalogSnapshot(malformedSnapshot)).toBe(false);
   });
 
+  it("rejects control catalog snapshots with planned mutating preview-action coverage drift", () => {
+    const snapshot = buildPrometheusControlCatalogSnapshot({ env: {} });
+    const malformedSnapshot = {
+      ...snapshot,
+      guardrails: {
+        ...snapshot.guardrails,
+        plannedMutatingPreviewActions: snapshot.guardrails.plannedMutatingPreviewActions.slice(1),
+      },
+    };
+    expect(isPrometheusControlCatalogSnapshot(malformedSnapshot)).toBe(false);
+  });
+
   it("rejects control catalog snapshots with summary read/write drift", () => {
     const snapshot = buildPrometheusControlCatalogSnapshot({ env: {} });
     const malformedSnapshot = {
