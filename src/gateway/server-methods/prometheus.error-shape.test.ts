@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
+import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
 import { prometheusHandlers } from "./prometheus.js";
+import { formatPlannedMutatingActionDisabledMessage } from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -211,8 +213,9 @@ describe("prometheus handler error shape parity", () => {
       undefined,
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: expect.stringContaining(
-          'Planned mutating action "autarch.gap-detection.commit" is disabled',
+        message: formatPlannedMutatingActionDisabledMessage(
+          "autarch.gap-detection.commit",
+          PROMETHEUS_MUTATING_CONTROLS_ENV,
         ),
       }),
     );

@@ -13,6 +13,7 @@ import {
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./prometheus-methods.js";
 import { assertPrometheusHandlerContract, prometheusHandlers } from "./prometheus.js";
+import { formatPlannedMutatingActionDisabledMessage } from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -953,8 +954,9 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
       undefined,
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: expect.stringContaining(
-          'Planned mutating action "autarch.gap-detection.commit" is disabled',
+        message: formatPlannedMutatingActionDisabledMessage(
+          "autarch.gap-detection.commit",
+          PROMETHEUS_MUTATING_CONTROLS_ENV,
         ),
       }),
     );

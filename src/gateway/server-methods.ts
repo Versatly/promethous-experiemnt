@@ -24,6 +24,10 @@ import {
   PROMETHEUS_MUTATING_CONTROLS_ENV,
 } from "./server-methods/prometheus-methods.js";
 import { prometheusHandlers } from "./server-methods/prometheus.js";
+import {
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./server-methods/prometheus.preflight-guards.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -124,14 +128,14 @@ function mutatingControlsDisabledError() {
 function plannedMutatingMethodDisabledError(method: string) {
   return errorShape(
     ErrorCodes.UNAVAILABLE,
-    `planned mutating method "${method}" is disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable guardrail preflight)`,
+    formatPlannedMutatingMethodDisabledMessage(method, PROMETHEUS_MUTATING_CONTROLS_ENV),
   );
 }
 
 function plannedMutatingMethodUnimplementedError(method: string) {
   return errorShape(
     ErrorCodes.UNAVAILABLE,
-    `planned mutating method "${method}" is not implemented yet`,
+    formatPlannedMutatingMethodNotImplementedMessage(method),
   );
 }
 

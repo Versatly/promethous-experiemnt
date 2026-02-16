@@ -5,6 +5,10 @@ import {
   getPrometheusPlannedMutatingMethodGuardError,
 } from "../server-methods.js";
 import { PROMETHEUS_MUTATING_CONTROLS_ENV } from "./prometheus-methods.js";
+import {
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 describe("PROMETHEUS mutating-control guard", () => {
   it("does not block non-mutating methods", () => {
@@ -62,8 +66,9 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toEqual(
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: expect.stringContaining(
-          'planned mutating method "prometheus.control.execute" is disabled',
+        message: formatPlannedMutatingMethodDisabledMessage(
+          "prometheus.control.execute",
+          PROMETHEUS_MUTATING_CONTROLS_ENV,
         ),
       }),
     );
@@ -84,7 +89,7 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toEqual(
       expect.objectContaining({
         code: ErrorCodes.UNAVAILABLE,
-        message: 'planned mutating method "prometheus.control.execute" is not implemented yet',
+        message: formatPlannedMutatingMethodNotImplementedMessage("prometheus.control.execute"),
       }),
     );
   });

@@ -9,6 +9,10 @@ import {
   PROMETHEUS_GATEWAY_READ_METHODS,
   PROMETHEUS_GATEWAY_WRITE_METHODS,
 } from "./prometheus-methods.js";
+import {
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 const READ_METHODS = PROMETHEUS_GATEWAY_READ_METHODS;
 const WRITE_METHODS = PROMETHEUS_GATEWAY_WRITE_METHODS;
@@ -211,7 +215,10 @@ describe("PROMETHEUS gateway authorization", () => {
         undefined,
         expect.objectContaining({
           code: "UNAVAILABLE",
-          message: expect.stringContaining(`planned mutating method "${method}" is disabled`),
+          message: formatPlannedMutatingMethodDisabledMessage(
+            method,
+            PROMETHEUS_MUTATING_CONTROLS_ENV,
+          ),
         }),
       );
     }
@@ -244,9 +251,7 @@ describe("PROMETHEUS gateway authorization", () => {
         undefined,
         expect.objectContaining({
           code: "UNAVAILABLE",
-          message: expect.stringContaining(
-            `planned mutating method "${method}" is not implemented yet`,
-          ),
+          message: formatPlannedMutatingMethodNotImplementedMessage(method),
         }),
       );
     }

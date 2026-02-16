@@ -19,6 +19,10 @@ import {
   resolveObserverStateDir,
   resolveTrajectoryWindowSize,
 } from "./prometheus.params.js";
+import {
+  formatPlannedMutatingActionDisabledMessage,
+  formatPlannedMutatingActionNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 export const PROMETHEUS_CONTROL_PREVIEW_ACTIONS = [
   "autarch.gap-detection",
@@ -301,10 +305,10 @@ export async function runPrometheusControlPreview(
       const controlsEnabled = arePrometheusMutatingControlsEnabled();
       if (!controlsEnabled) {
         return unavailableRequest(
-          `Planned mutating action "${rawAction}" is disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable guardrail preflight)`,
+          formatPlannedMutatingActionDisabledMessage(rawAction, PROMETHEUS_MUTATING_CONTROLS_ENV),
         );
       }
-      return unavailableRequest(`Planned mutating action "${rawAction}" is not implemented yet`);
+      return unavailableRequest(formatPlannedMutatingActionNotImplementedMessage(rawAction));
     }
     if (!isPrometheusControlPreviewAction(rawAction)) {
       return invalidRequest(`Unsupported control preview action "${rawAction}"`);

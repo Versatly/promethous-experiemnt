@@ -5,6 +5,12 @@ import {
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
 } from "../prometheus/index.js";
+import {
+  formatPlannedMutatingActionDisabledMessage,
+  formatPlannedMutatingActionNotImplementedMessage,
+  formatPlannedMutatingMethodDisabledMessage,
+  formatPlannedMutatingMethodNotImplementedMessage,
+} from "./server-methods/prometheus.preflight-guards.js";
 import { startGatewayServerHarness, type GatewayServerHarness } from "./server.e2e-ws-harness.js";
 import { installGatewayTestHooks, onceMessage } from "./test-helpers.js";
 
@@ -1101,8 +1107,11 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toContain(
-      'Planned mutating action "autarch.gap-detection.commit" is disabled',
+    expect(response.error?.message).toBe(
+      formatPlannedMutatingActionDisabledMessage(
+        "autarch.gap-detection.commit",
+        "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+      ),
     );
     ws.close();
   });
@@ -1135,8 +1144,8 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toContain(
-      'Planned mutating action "autarch.gap-detection.commit" is not implemented yet',
+    expect(response.error?.message).toBe(
+      formatPlannedMutatingActionNotImplementedMessage("autarch.gap-detection.commit"),
     );
     ws.close();
   });
@@ -1165,8 +1174,11 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toContain(
-      'planned mutating method "prometheus.control.execute" is disabled',
+    expect(response.error?.message).toBe(
+      formatPlannedMutatingMethodDisabledMessage(
+        "prometheus.control.execute",
+        "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
+      ),
     );
     ws.close();
   });
@@ -1196,8 +1208,8 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("UNAVAILABLE");
-    expect(response.error?.message).toContain(
-      'planned mutating method "prometheus.control.execute" is not implemented yet',
+    expect(response.error?.message).toBe(
+      formatPlannedMutatingMethodNotImplementedMessage("prometheus.control.execute"),
     );
     ws.close();
   });

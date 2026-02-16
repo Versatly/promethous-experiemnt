@@ -20,6 +20,10 @@ import {
   isPrometheusControlPreviewAction,
   runPrometheusControlPreview,
 } from "./prometheus.control-preview.js";
+import {
+  formatPlannedMutatingActionDisabledMessage,
+  formatPlannedMutatingActionNotImplementedMessage,
+} from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -279,7 +283,10 @@ describe("prometheus control preview helpers", () => {
       ok: false,
       error: {
         code: ErrorCodes.UNAVAILABLE,
-        message: `Planned mutating action "autarch.gap-detection.commit" is disabled (set ${PROMETHEUS_MUTATING_CONTROLS_ENV}=1 to enable guardrail preflight)`,
+        message: formatPlannedMutatingActionDisabledMessage(
+          "autarch.gap-detection.commit",
+          PROMETHEUS_MUTATING_CONTROLS_ENV,
+        ),
       },
     });
   });
@@ -294,7 +301,7 @@ describe("prometheus control preview helpers", () => {
       ok: false,
       error: {
         code: ErrorCodes.UNAVAILABLE,
-        message: 'Planned mutating action "autarch.gap-detection.commit" is not implemented yet',
+        message: formatPlannedMutatingActionNotImplementedMessage("autarch.gap-detection.commit"),
       },
     });
   });
