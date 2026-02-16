@@ -128,6 +128,7 @@ All `prometheus.*` gateway adapters are read-scope methods:
 
 - allowed for `operator.read`, `operator.write`, and `operator.admin`
 - rejected when read scope is missing.
+- rejected for `node` role (operator-only read adapters).
 
 This keeps parity with existing gateway authorization semantics for telemetry methods.
 
