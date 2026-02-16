@@ -993,6 +993,42 @@ describe("prometheusHandlers.prometheus.control.catalog", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected catalog snapshot method list diverges from canonical coverage", async () => {
+    const handlers = createPrometheusHandlers({
+      buildControlCatalogSnapshot: () => {
+        const snapshot = buildPrometheusControlCatalogSnapshot();
+        return {
+          ...snapshot,
+          methods: snapshot.methods.map((method, index, methods) =>
+            index === methods.length - 1 ? (methods[0] ?? method) : method,
+          ),
+        } as never;
+      },
+    });
+    const respond = vi.fn();
+    await handlers["prometheus.control.catalog"]({
+      req: {
+        type: "req",
+        id: "control-catalog-divergent-method-coverage",
+        method: "prometheus.control.catalog",
+      },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: expect.stringContaining("Invalid control catalog snapshot shape"),
+      }),
+    );
+  });
 });
 
 describe("prometheusHandlers.prometheus.control.preview", () => {

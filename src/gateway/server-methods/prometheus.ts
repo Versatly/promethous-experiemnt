@@ -13,6 +13,7 @@ import {
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
 import {
+  PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
   getPrometheusPlannedMutatingMethodMetadata,
   getPrometheusPlannedMutatingMethodPreflight,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
@@ -24,6 +25,7 @@ import {
 } from "./prometheus.control-catalog.js";
 import {
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+  PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
   getPrometheusPlannedMutatingPreviewActionMetadata,
   getPrometheusPlannedMutatingPreviewActionPreflight,
   isPrometheusControlPreviewAction,
@@ -71,6 +73,19 @@ function isStringArray(value: unknown): value is string[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function areSameCanonicalStringLists(
+  actual: readonly string[],
+  expected: readonly string[],
+): boolean {
+  const actualSorted = [...actual].toSorted();
+  const expectedSorted = [...expected].toSorted();
+  return (
+    new Set(actualSorted).size === actualSorted.length &&
+    actualSorted.length === expectedSorted.length &&
+    actualSorted.every((entry, index) => entry === expectedSorted[index])
+  );
 }
 
 function isPrometheusPlannedPreflightShape(value: unknown): value is {
@@ -300,6 +315,20 @@ function isPrometheusControlCatalogSnapshot(
   const mutatingActionsFromControlPreview = controlPreviewActions
     ?.filter((action) => action.mutatesState)
     .map((action) => action.action);
+  const methodNames = methods?.map((method) => method.method);
+  const previewActionNames = controlPreviewActions?.map((action) => action.action);
+  const plannedMutatingMethodNames = Array.isArray(guardrails?.plannedMutatingMethods)
+    ? guardrails.plannedMutatingMethods.map((method) => method.method)
+    : null;
+  const plannedMutatingActionNames = Array.isArray(guardrails?.plannedMutatingPreviewActions)
+    ? guardrails.plannedMutatingPreviewActions.map((action) => action.action)
+    : null;
+  const expectedMethodNames = Object.keys(PROMETHEUS_GATEWAY_METHOD_METADATA);
+  const expectedPreviewActionNames = Object.keys(PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA);
+  const expectedPlannedMethodNames = Object.keys(PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA);
+  const expectedPlannedActionNames = Object.keys(
+    PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
+  );
   return (
     isFiniteNumber(candidate.ts) &&
     !!summary &&
@@ -334,6 +363,14 @@ function isPrometheusControlCatalogSnapshot(
     summary.mutatingPreviewActions === mutatingActionsFromControlPreview?.length &&
     summary.plannedMutatingPreviewActions === guardrails.plannedMutatingPreviewActions.length &&
     Array.isArray(guardrails.mutatingMethods) &&
+    !!methodNames &&
+    !!previewActionNames &&
+    !!plannedMutatingMethodNames &&
+    !!plannedMutatingActionNames &&
+    areSameCanonicalStringLists(methodNames, expectedMethodNames) &&
+    areSameCanonicalStringLists(previewActionNames, expectedPreviewActionNames) &&
+    areSameCanonicalStringLists(plannedMutatingMethodNames, expectedPlannedMethodNames) &&
+    areSameCanonicalStringLists(plannedMutatingActionNames, expectedPlannedActionNames) &&
     guardrails.mutatingMethods.toSorted().join("|") ===
       (mutatingMethodsFromMethods ?? []).toSorted().join("|") &&
     Array.isArray(guardrails.mutatingPreviewActions) &&
