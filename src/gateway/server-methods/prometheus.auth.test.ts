@@ -884,4 +884,57 @@ describe("PROMETHEUS gateway authorization", () => {
       }),
     );
   });
+
+  it("returns UNAVAILABLE when injected preview dependency violates bounded recursion invariants at request level", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "preview-recursion-bounds-request-level",
+        method: "prometheus.control.preview",
+        params: {
+          action: "recursion.mutation-evaluation",
+        },
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      extraHandlers: createPrometheusHandlers({
+        runControlPreview: async () =>
+          ({
+            ok: true,
+            payload: {
+              ts: Date.now(),
+              action: "recursion.mutation-evaluation",
+              mutatesState: false,
+              preview: {
+                evaluation: {
+                  mutationId: "mut-1",
+                  accepted: true,
+                  scoreDelta: 1.2,
+                  baselineScore: 0.4,
+                  candidateScore: 1.1,
+                  rationale: "invalid bounds",
+                },
+              },
+            },
+          }) as never,
+      }),
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: expect.stringContaining("Invalid control preview result shape"),
+      }),
+    );
+  });
 });
