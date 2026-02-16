@@ -3,6 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  createFileHeliosTrajectoryStore,
+  createFilePrometheusEventStore,
+} from "../../prometheus/index.js";
+import {
   isPrometheusControlCatalogSnapshot,
   isPrometheusControlPreviewResult,
 } from "./prometheus.contract-guards.js";
@@ -81,6 +85,71 @@ describe("prometheus contract guards", () => {
     const result = await runPrometheusControlPreview({
       stateDir,
       action: "autarch.gap-detection",
+    });
+    expect(result.ok).toBe(true);
+    expect(isPrometheusControlPreviewResult(result)).toBe(true);
+  });
+
+  it("accepts valid HELIOS preview success results", async () => {
+    const stateDir = await makeTempDir("prometheus-contract-guards-preview-helios-");
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-goal-helios",
+      type: "goal.created",
+      occurredAt: 1,
+      payload: {
+        goalId: "goal-helios",
+        title: "Helios goal",
+        objective: "Track trajectory",
+        priority: 80,
+      },
+    });
+    const trajectoryStore = createFileHeliosTrajectoryStore(
+      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+    );
+    await trajectoryStore.append({
+      goalId: "goal-helios",
+      snapshot: {
+        at: 2,
+        completionRatio: 0.3,
+        blockedRatio: 0.1,
+        score: 0.5,
+      },
+    });
+
+    const result = await runPrometheusControlPreview({
+      stateDir,
+      action: "helios.trajectory-evaluation",
+      goalId: "goal-helios",
+    });
+    expect(result.ok).toBe(true);
+    expect(isPrometheusControlPreviewResult(result)).toBe(true);
+  });
+
+  it("accepts valid recursion preview success results", async () => {
+    const stateDir = await makeTempDir("prometheus-contract-guards-preview-recursion-");
+    const result = await runPrometheusControlPreview({
+      stateDir,
+      action: "recursion.mutation-evaluation",
+      proposal: {
+        mutationId: "mut-1",
+        title: "Scale horizon",
+        hypothesis: "improve fitness",
+        risk: "medium",
+        expectedGain: 0.1,
+      },
+      baseline: {
+        objectiveFit: 0.5,
+        stability: 0.7,
+        throughput: 0.45,
+      },
+      candidate: {
+        objectiveFit: 0.7,
+        stability: 0.72,
+        throughput: 0.51,
+      },
     });
     expect(result.ok).toBe(true);
     expect(isPrometheusControlPreviewResult(result)).toBe(true);
