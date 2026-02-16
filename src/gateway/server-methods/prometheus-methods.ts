@@ -1,5 +1,6 @@
 export const PROMETHEUS_GATEWAY_READ_METHODS = [
   "prometheus.status",
+  "prometheus.control.catalog",
   "prometheus.trajectory",
   "prometheus.goals",
   "prometheus.recursion",
@@ -32,6 +33,10 @@ export const PROMETHEUS_GATEWAY_METHOD_METADATA: Record<
   PrometheusGatewayMethodMetadata
 > = {
   "prometheus.status": {
+    access: "read",
+    mutatesState: false,
+  },
+  "prometheus.control.catalog": {
     access: "read",
     mutatesState: false,
   },

@@ -70,12 +70,13 @@ To keep existing gateway consumers stable while PROMETHEUS internals evolve, the
 read-only compatibility adapters under the `prometheus.*` namespace:
 
 1. `prometheus.status`
-2. `prometheus.trajectory`
-3. `prometheus.goals`
-4. `prometheus.recursion`
-5. `prometheus.autarch`
-6. `prometheus.monolith`
-7. `prometheus.control.preview`
+2. `prometheus.control.catalog`
+3. `prometheus.trajectory`
+4. `prometheus.goals`
+5. `prometheus.recursion`
+6. `prometheus.autarch`
+7. `prometheus.monolith`
+8. `prometheus.control.preview`
 
 These methods are intentionally scoped to telemetry and read models. They do not mutate state.
 
@@ -97,6 +98,10 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `scoreDeltaFromPrevious`
   - `divergence`
   - `snapshots`
+- `prometheus.control.catalog`:
+  - `ts`
+  - `methods`
+  - `controlPreview`
 - `prometheus.goals`:
   - `ts`
   - `total`
@@ -157,6 +162,7 @@ caught before cutover.
 PROMETHEUS adapters are split between read telemetry and control preview surfaces:
 
 - Read telemetry adapters (`status`, `trajectory`, `goals`, `recursion`, `autarch`, `monolith`):
+- Read telemetry adapters (`status`, `control.catalog`, `trajectory`, `goals`, `recursion`, `autarch`, `monolith`):
   - allowed for `operator.read`, `operator.write`, and `operator.admin`
   - rejected when read scope is missing.
 - Control preview adapter (`prometheus.control.preview`):

@@ -665,6 +665,70 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("returns control catalog metadata for read-compatible introspection", async () => {
+    const { ws } = await harness.openClient();
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-catalog",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-catalog",
+        method: "prometheus.control.catalog",
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      payload?: {
+        methods?: Array<{ method?: string; access?: string; mutatesState?: boolean }>;
+        controlPreview?: {
+          method?: string;
+          actions?: Array<{ action?: string; mutatesState?: boolean; requiredParams?: string[] }>;
+        };
+      };
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.methods).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: "prometheus.control.catalog",
+          access: "read",
+          mutatesState: false,
+        }),
+        expect.objectContaining({
+          method: "prometheus.control.preview",
+          access: "write",
+          mutatesState: false,
+        }),
+      ]),
+    );
+    expect(response.payload?.controlPreview?.method).toBe("prometheus.control.preview");
+    expect(response.payload?.controlPreview?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "autarch.gap-detection",
+          requiredParams: [],
+          mutatesState: false,
+        }),
+        expect.objectContaining({
+          action: "helios.trajectory-evaluation",
+          requiredParams: ["goalId"],
+          mutatesState: false,
+        }),
+        expect.objectContaining({
+          action: "recursion.mutation-evaluation",
+          requiredParams: ["proposal", "baseline", "candidate"],
+          mutatesState: false,
+        }),
+      ]),
+    );
+    expect(response.error).toBeUndefined();
+    ws.close();
+  });
+
   it("returns HELIOS control preview payload for operator.write", async () => {
     const stateDir = resolveStateDir();
     const eventStore = createFilePrometheusEventStore(

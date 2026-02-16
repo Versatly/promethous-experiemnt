@@ -136,6 +136,9 @@ describe("prometheus handlers response shape", () => {
     const goalsPayload = await call("prometheus.goals", { stateDir });
     const recursionPayload = await call("prometheus.recursion", { stateDir });
     const autarchPayload = await call("prometheus.autarch", { stateDir });
+    const controlCatalogPayload = await call("prometheus.control.catalog", {
+      stateDir,
+    });
     const controlPreviewPayload = await call("prometheus.control.preview", {
       stateDir,
       action: "autarch.gap-detection",
@@ -170,6 +173,7 @@ describe("prometheus handlers response shape", () => {
       "summary",
       "ts",
     ]);
+    expect(payloadTopKeys(controlCatalogPayload)).toEqual(["controlPreview", "methods", "ts"]);
     expect(payloadTopKeys(controlPreviewPayload)).toEqual([
       "action",
       "mutatesState",

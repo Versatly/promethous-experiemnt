@@ -588,6 +588,59 @@ describe("prometheusHandlers.prometheus.monolith", () => {
   });
 });
 
+describe("prometheusHandlers.prometheus.control.catalog", () => {
+  it("returns control-surface metadata for method and action contracts", async () => {
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.catalog"]({
+      req: { type: "req", id: "control-catalog-1", method: "prometheus.control.catalog" },
+      params: {},
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        methods: expect.arrayContaining([
+          expect.objectContaining({
+            method: "prometheus.control.catalog",
+            access: "read",
+            mutatesState: false,
+          }),
+          expect.objectContaining({
+            method: "prometheus.control.preview",
+            access: "write",
+            mutatesState: false,
+          }),
+        ]),
+        controlPreview: expect.objectContaining({
+          method: "prometheus.control.preview",
+          actions: expect.arrayContaining([
+            expect.objectContaining({
+              action: "autarch.gap-detection",
+              mutatesState: false,
+              requiredParams: [],
+            }),
+            expect.objectContaining({
+              action: "helios.trajectory-evaluation",
+              mutatesState: false,
+              requiredParams: ["goalId"],
+            }),
+            expect.objectContaining({
+              action: "recursion.mutation-evaluation",
+              mutatesState: false,
+              requiredParams: ["proposal", "baseline", "candidate"],
+            }),
+          ]),
+        }),
+      }),
+      undefined,
+    );
+  });
+});
+
 describe("prometheusHandlers.prometheus.control.preview", () => {
   it("returns AUTARCH gap-detection preview without mutating state", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");

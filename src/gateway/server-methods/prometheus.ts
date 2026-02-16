@@ -12,7 +12,12 @@ import {
 } from "../../prometheus/index.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
-import { runPrometheusControlPreview } from "./prometheus.control-preview.js";
+import { PROMETHEUS_GATEWAY_METHOD_METADATA } from "./prometheus-methods.js";
+import {
+  PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
+  PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+  runPrometheusControlPreview,
+} from "./prometheus.control-preview.js";
 import {
   CAPITAL_FORMS,
   type CapitalForm,
@@ -347,6 +352,35 @@ export const prometheusHandlers: GatewayRequestHandlers = {
           goalsWithUnresolvedGaps,
           gaps,
           capabilities,
+        },
+        undefined,
+      );
+    } catch (error) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+    }
+  },
+  "prometheus.control.catalog": async ({ respond }) => {
+    try {
+      const methods = Object.entries(PROMETHEUS_GATEWAY_METHOD_METADATA)
+        .toSorted(([left], [right]) => left.localeCompare(right))
+        .map(([method, metadata]) => ({
+          method,
+          access: metadata.access,
+          mutatesState: metadata.mutatesState,
+        }));
+      const actions = [...PROMETHEUS_CONTROL_PREVIEW_ACTIONS].map((action) => ({
+        action,
+        ...PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA[action],
+      }));
+      respond(
+        true,
+        {
+          ts: Date.now(),
+          methods,
+          controlPreview: {
+            method: "prometheus.control.preview",
+            actions,
+          },
         },
         undefined,
       );
