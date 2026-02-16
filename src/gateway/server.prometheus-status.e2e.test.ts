@@ -546,4 +546,30 @@ describe("gateway prometheus.status", () => {
     );
     ws.close();
   });
+
+  it("rejects node-role access to prometheus methods", async () => {
+    const { ws } = await harness.openClient({
+      role: "node",
+      scopes: ["operator.read"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-node-deny",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-node-deny",
+        method: "prometheus.status",
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.message).toContain("unauthorized role: node");
+    ws.close();
+  });
 });
