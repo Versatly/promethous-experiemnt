@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertPrometheusGatewayMethodMetadataContract,
   PROMETHEUS_GATEWAY_METHODS,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_GATEWAY_READ_METHODS,
@@ -48,5 +49,24 @@ describe("PROMETHEUS method access map", () => {
     for (const method of PROMETHEUS_GATEWAY_METHODS) {
       expect(PROMETHEUS_GATEWAY_METHOD_METADATA[method].mutatesState).toBe(false);
     }
+  });
+
+  it("fails fast when method metadata diverges from method lists", () => {
+    expect(() =>
+      assertPrometheusGatewayMethodMetadataContract({
+        readMethods: ["prometheus.status"],
+        writeMethods: [],
+        methodMetadata: {
+          "prometheus.status": {
+            access: "read",
+            mutatesState: false,
+          },
+          "prometheus.control.preview": {
+            access: "write",
+            mutatesState: false,
+          },
+        },
+      }),
+    ).toThrow("methods and metadata keys diverged");
   });
 });

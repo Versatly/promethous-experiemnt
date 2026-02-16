@@ -65,3 +65,43 @@ export const PROMETHEUS_GATEWAY_METHOD_METADATA: Record<
     mutatesState: false,
   },
 };
+
+export function assertPrometheusGatewayMethodMetadataContract(args: {
+  readMethods: readonly string[];
+  writeMethods: readonly string[];
+  methodMetadata: Record<string, PrometheusGatewayMethodMetadata>;
+}): void {
+  const { readMethods, writeMethods, methodMetadata } = args;
+  const listedMethods = [...readMethods, ...writeMethods];
+  if (new Set(listedMethods).size !== listedMethods.length) {
+    throw new Error("PROMETHEUS method contract mismatch: duplicate methods detected");
+  }
+  const metadataMethods = Object.keys(methodMetadata);
+  if (new Set(metadataMethods).size !== metadataMethods.length) {
+    throw new Error("PROMETHEUS method contract mismatch: duplicate metadata entries detected");
+  }
+  const listedSorted = [...listedMethods].toSorted();
+  const metadataSorted = [...metadataMethods].toSorted();
+  if (
+    listedSorted.length !== metadataSorted.length ||
+    listedSorted.some((method, index) => metadataSorted[index] !== method)
+  ) {
+    throw new Error("PROMETHEUS method contract mismatch: methods and metadata keys diverged");
+  }
+  for (const method of readMethods) {
+    if (methodMetadata[method]?.access !== "read") {
+      throw new Error(`PROMETHEUS method contract mismatch: ${method} must be read access`);
+    }
+  }
+  for (const method of writeMethods) {
+    if (methodMetadata[method]?.access !== "write") {
+      throw new Error(`PROMETHEUS method contract mismatch: ${method} must be write access`);
+    }
+  }
+}
+
+assertPrometheusGatewayMethodMetadataContract({
+  readMethods: PROMETHEUS_GATEWAY_READ_METHODS,
+  writeMethods: PROMETHEUS_GATEWAY_WRITE_METHODS,
+  methodMetadata: PROMETHEUS_GATEWAY_METHOD_METADATA,
+});

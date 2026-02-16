@@ -8,6 +8,7 @@ import {
 } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import {
+  assertPrometheusControlPreviewActionContract,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   isPrometheusControlPreviewAction,
@@ -252,5 +253,23 @@ describe("prometheus control preview helpers", () => {
         message: "baseline and candidate fitness snapshots are required",
       },
     });
+  });
+
+  it("fails fast when action metadata diverges from action list", () => {
+    expect(() =>
+      assertPrometheusControlPreviewActionContract({
+        actions: ["autarch.gap-detection"],
+        actionMetadata: {
+          "autarch.gap-detection": {
+            mutatesState: false,
+            requiredParams: [],
+          },
+          "helios.trajectory-evaluation": {
+            mutatesState: false,
+            requiredParams: ["goalId"],
+          },
+        },
+      }),
+    ).toThrow("action list and metadata keys diverged");
   });
 });

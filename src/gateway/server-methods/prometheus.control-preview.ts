@@ -44,6 +44,47 @@ export const PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA = {
   },
 } as const satisfies Record<PrometheusControlPreviewAction, PrometheusControlPreviewActionMetadata>;
 
+export function assertPrometheusControlPreviewActionContract(args: {
+  actions: readonly string[];
+  actionMetadata: Record<string, PrometheusControlPreviewActionMetadata>;
+}): void {
+  const { actions, actionMetadata } = args;
+  if (new Set(actions).size !== actions.length) {
+    throw new Error("PROMETHEUS control action contract mismatch: duplicate actions detected");
+  }
+  const metadataActions = Object.keys(actionMetadata);
+  if (new Set(metadataActions).size !== metadataActions.length) {
+    throw new Error(
+      "PROMETHEUS control action contract mismatch: duplicate metadata actions detected",
+    );
+  }
+  const actionsSorted = [...actions].toSorted();
+  const metadataSorted = [...metadataActions].toSorted();
+  if (
+    actionsSorted.length !== metadataSorted.length ||
+    actionsSorted.some((action, index) => metadataSorted[index] !== action)
+  ) {
+    throw new Error(
+      "PROMETHEUS control action contract mismatch: action list and metadata keys diverged",
+    );
+  }
+  for (const action of actions) {
+    if (typeof actionMetadata[action]?.mutatesState !== "boolean") {
+      throw new Error(`PROMETHEUS control action contract mismatch: ${action} missing mutability`);
+    }
+    if (!Array.isArray(actionMetadata[action]?.requiredParams)) {
+      throw new Error(
+        `PROMETHEUS control action contract mismatch: ${action} missing required params`,
+      );
+    }
+  }
+}
+
+assertPrometheusControlPreviewActionContract({
+  actions: PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
+  actionMetadata: PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
+});
+
 type MutationFitnessSnapshotInput = {
   objectiveFit: number;
   stability: number;
