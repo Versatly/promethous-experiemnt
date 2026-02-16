@@ -70,6 +70,41 @@ describe("PROMETHEUS gateway authorization", () => {
     expect(ok).toBe(true);
   });
 
+  it("keeps canonical non-mutating auth behavior when method metadata override diverges", async () => {
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "read-metadata-diverges",
+        method: "prometheus.status",
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.read"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusMethodMetadata: () => ({
+          access: "write",
+          mutatesState: true,
+        }),
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        summary: expect.any(Object),
+      }),
+      undefined,
+    );
+  });
+
   it.each(READ_METHODS)("rejects missing read scope for %s", async (method) => {
     const respond = vi.fn();
     await handleGatewayRequest({

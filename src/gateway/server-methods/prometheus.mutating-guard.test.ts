@@ -51,6 +51,18 @@ describe("PROMETHEUS mutating-control guard", () => {
     expect(error).toBeUndefined();
   });
 
+  it("prefers canonical metadata when resolver mutability diverges", () => {
+    const error = getPrometheusMutatingControlGuardError({
+      method: "prometheus.status",
+      env: {},
+      resolveMethodMetadata: () => ({
+        access: "write",
+        mutatesState: true,
+      }),
+    });
+    expect(error).toBeUndefined();
+  });
+
   it("returns UNAVAILABLE for planned mutating methods when env guard is disabled", () => {
     const preflight = buildPrometheusPlannedMutatingMethodPreflight({
       method: "prometheus.control.execute",
