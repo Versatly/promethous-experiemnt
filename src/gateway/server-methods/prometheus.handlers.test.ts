@@ -7,6 +7,7 @@ import {
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
 } from "../../prometheus/index.js";
+import { ErrorCodes } from "../protocol/index.js";
 import { prometheusHandlers } from "./prometheus.js";
 
 const cleanupDirs = new Set<string>();
@@ -701,6 +702,89 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
         }),
       }),
       undefined,
+    );
+  });
+
+  it("returns HELIOS trajectory evaluation preview for known goal", async () => {
+    const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-goal",
+      type: "goal.created",
+      occurredAt: 1,
+      payload: {
+        goalId: "goal-helios",
+        title: "Helios goal",
+        objective: "Track trajectory",
+        priority: 80,
+      },
+    });
+    const trajectoryStore = createFileHeliosTrajectoryStore(
+      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+    );
+    await trajectoryStore.append({
+      goalId: "goal-helios",
+      snapshot: {
+        at: 2,
+        completionRatio: 0.3,
+        blockedRatio: 0.1,
+        score: 0.5,
+      },
+    });
+
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-3", method: "prometheus.control.preview" },
+      params: {
+        stateDir,
+        action: "helios.trajectory-evaluation",
+        goalId: "goal-helios",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        action: "helios.trajectory-evaluation",
+        mutatesState: false,
+        preview: expect.objectContaining({
+          goalId: "goal-helios",
+          computedSnapshot: expect.objectContaining({
+            at: expect.any(Number),
+            completionRatio: expect.any(Number),
+          }),
+        }),
+      }),
+      undefined,
+    );
+  });
+
+  it("rejects unsupported control preview action with INVALID_REQUEST", async () => {
+    const respond = vi.fn();
+    await prometheusHandlers["prometheus.control.preview"]({
+      req: { type: "req", id: "control-4", method: "prometheus.control.preview" },
+      params: {
+        action: "prometheus.unknown-action",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_REQUEST,
+        message: 'Unsupported control preview action "prometheus.unknown-action"',
+      }),
     );
   });
 });

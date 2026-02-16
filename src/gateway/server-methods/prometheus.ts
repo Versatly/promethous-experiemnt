@@ -2,19 +2,17 @@ import path from "node:path";
 import type { GatewayRequestHandlers } from "./types.js";
 import {
   buildCapabilityGraph,
-  computeGoalTrajectorySnapshot,
   createFileHeliosTrajectoryStore,
   createFilePrometheusEventStore,
-  detectCapabilityGapsFromFailedPaths,
   detectTrajectoryDivergence,
   evaluateAlignmentGuardrails,
   evaluateInstitutionAction,
-  evaluateMutationProposal,
   planCapitalAllocations,
   replayPrometheusEvents,
 } from "../../prometheus/index.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
+import { runPrometheusControlPreview } from "./prometheus.control-preview.js";
 import {
   CAPITAL_FORMS,
   type CapitalForm,
@@ -27,34 +25,6 @@ import {
   resolveSinceAt,
   resolveTrajectoryWindowSize,
 } from "./prometheus.params.js";
-
-type MutationFitnessSnapshotInput = {
-  objectiveFit: number;
-  stability: number;
-  throughput: number;
-};
-
-function isMutationFitnessSnapshotInput(value: unknown): value is MutationFitnessSnapshotInput {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return false;
-  }
-  const candidate = value as Partial<MutationFitnessSnapshotInput>;
-  return (
-    typeof candidate.objectiveFit === "number" &&
-    Number.isFinite(candidate.objectiveFit) &&
-    typeof candidate.stability === "number" &&
-    Number.isFinite(candidate.stability) &&
-    typeof candidate.throughput === "number" &&
-    Number.isFinite(candidate.throughput)
-  );
-}
-
-function resolveMutationRisk(value: unknown): "low" | "medium" | "high" {
-  if (value === "low" || value === "high") {
-    return value;
-  }
-  return "medium";
-}
 
 export const prometheusHandlers: GatewayRequestHandlers = {
   "prometheus.status": async ({ respond, params }) => {
@@ -385,201 +355,12 @@ export const prometheusHandlers: GatewayRequestHandlers = {
     }
   },
   "prometheus.control.preview": async ({ respond, params }) => {
-    try {
-      const action =
-        typeof params.action === "string" && params.action.trim().length > 0
-          ? params.action.trim()
-          : null;
-      if (!action) {
-        respond(
-          false,
-          undefined,
-          errorShape(
-            ErrorCodes.INVALID_REQUEST,
-            "action is required for prometheus.control.preview",
-          ),
-        );
-        return;
-      }
-
-      const stateDir = resolveObserverStateDir(params);
-      const eventStore = createFilePrometheusEventStore(
-        path.join(stateDir, "prometheus", "events.jsonl"),
-      );
-      const events = await eventStore.readAll();
-      const state = replayPrometheusEvents(events);
-      const now = Date.now();
-
-      if (action === "autarch.gap-detection") {
-        const suggestions = detectCapabilityGapsFromFailedPaths({
-          state,
-          now,
-          maxSuggestions: resolveMaxItems(params, 10),
-        });
-        respond(
-          true,
-          {
-            ts: now,
-            action,
-            mutatesState: false,
-            preview: {
-              suggestedGapCount: suggestions.length,
-              suggestions: suggestions.map((suggestion) => ({
-                suggestionId: suggestion.suggestionId,
-                goalId: suggestion.goalId,
-                severity: suggestion.severity,
-                description: suggestion.description,
-              })),
-            },
-          },
-          undefined,
-        );
-        return;
-      }
-
-      if (action === "helios.trajectory-evaluation") {
-        const goalId =
-          typeof params.goalId === "string" && params.goalId.trim().length > 0
-            ? params.goalId.trim()
-            : null;
-        if (!goalId) {
-          respond(
-            false,
-            undefined,
-            errorShape(ErrorCodes.INVALID_REQUEST, "goalId is required for HELIOS preview"),
-          );
-          return;
-        }
-        const goal = state.goals[goalId];
-        if (!goal) {
-          respond(
-            false,
-            undefined,
-            errorShape(ErrorCodes.INVALID_REQUEST, `Unknown goalId "${goalId}"`),
-          );
-          return;
-        }
-        const snapshot = computeGoalTrajectorySnapshot({
-          state,
-          rootGoalId: goalId,
-          at: now,
-        });
-        const trajectoryStore = createFileHeliosTrajectoryStore(
-          path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
-        );
-        const snapshots = await trajectoryStore.readWindow({
-          goalId,
-          maxSnapshots: resolveTrajectoryWindowSize(params),
-        });
-        const divergence = detectTrajectoryDivergence({ snapshots });
-        respond(
-          true,
-          {
-            ts: now,
-            action,
-            mutatesState: false,
-            preview: {
-              goalId,
-              goalStatus: goal.status,
-              computedSnapshot: snapshot,
-              priorWindowSize: snapshots.length,
-              divergence,
-            },
-          },
-          undefined,
-        );
-        return;
-      }
-
-      if (action === "recursion.mutation-evaluation") {
-        const proposal = params.proposal;
-        const baseline = params.baseline;
-        const candidate = params.candidate;
-        if (!proposal || typeof proposal !== "object") {
-          respond(
-            false,
-            undefined,
-            errorShape(ErrorCodes.INVALID_REQUEST, "proposal object is required"),
-          );
-          return;
-        }
-        if (
-          !isMutationFitnessSnapshotInput(baseline) ||
-          !isMutationFitnessSnapshotInput(candidate)
-        ) {
-          respond(
-            false,
-            undefined,
-            errorShape(
-              ErrorCodes.INVALID_REQUEST,
-              "baseline and candidate fitness snapshots are required",
-            ),
-          );
-          return;
-        }
-        const proposalRecord = proposal as Record<string, unknown>;
-        const mutationId =
-          typeof proposalRecord.mutationId === "string" && proposalRecord.mutationId.trim()
-            ? proposalRecord.mutationId.trim()
-            : null;
-        const title =
-          typeof proposalRecord.title === "string" && proposalRecord.title.trim()
-            ? proposalRecord.title.trim()
-            : null;
-        const hypothesis =
-          typeof proposalRecord.hypothesis === "string" && proposalRecord.hypothesis.trim()
-            ? proposalRecord.hypothesis.trim()
-            : null;
-        const expectedGain =
-          typeof proposalRecord.expectedGain === "number" &&
-          Number.isFinite(proposalRecord.expectedGain)
-            ? proposalRecord.expectedGain
-            : 0;
-        if (!mutationId || !title || !hypothesis) {
-          respond(
-            false,
-            undefined,
-            errorShape(
-              ErrorCodes.INVALID_REQUEST,
-              "proposal requires mutationId, title, and hypothesis",
-            ),
-          );
-          return;
-        }
-        const evaluation = evaluateMutationProposal({
-          proposal: {
-            mutationId,
-            title,
-            hypothesis,
-            risk: resolveMutationRisk(proposalRecord.risk),
-            expectedGain,
-          },
-          baseline,
-          candidate,
-        });
-        respond(
-          true,
-          {
-            ts: now,
-            action,
-            mutatesState: false,
-            preview: {
-              evaluation,
-            },
-          },
-          undefined,
-        );
-        return;
-      }
-
-      respond(
-        false,
-        undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, `Unsupported control preview action "${action}"`),
-      );
-    } catch (error) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
+    const result = await runPrometheusControlPreview(params);
+    if (!result.ok) {
+      respond(false, undefined, errorShape(result.error.code, result.error.message));
+      return;
     }
+    respond(true, result.payload, undefined);
   },
   "prometheus.monolith": async ({ respond, params }) => {
     try {

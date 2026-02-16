@@ -1,0 +1,253 @@
+import path from "node:path";
+import {
+  computeGoalTrajectorySnapshot,
+  createFileHeliosTrajectoryStore,
+  createFilePrometheusEventStore,
+  detectCapabilityGapsFromFailedPaths,
+  detectTrajectoryDivergence,
+  evaluateMutationProposal,
+  replayPrometheusEvents,
+} from "../../prometheus/index.js";
+import { type ErrorCode, ErrorCodes } from "../protocol/index.js";
+import { formatForLog } from "../ws-log.js";
+import {
+  resolveMaxItems,
+  resolveObserverStateDir,
+  resolveTrajectoryWindowSize,
+} from "./prometheus.params.js";
+
+export const PROMETHEUS_CONTROL_PREVIEW_ACTIONS = [
+  "autarch.gap-detection",
+  "helios.trajectory-evaluation",
+  "recursion.mutation-evaluation",
+] as const;
+
+export type PrometheusControlPreviewAction = (typeof PROMETHEUS_CONTROL_PREVIEW_ACTIONS)[number];
+
+type MutationFitnessSnapshotInput = {
+  objectiveFit: number;
+  stability: number;
+  throughput: number;
+};
+
+type PrometheusControlPreviewError = {
+  code: ErrorCode;
+  message: string;
+};
+
+type PrometheusControlPreviewSuccess = {
+  ok: true;
+  payload: {
+    ts: number;
+    action: PrometheusControlPreviewAction;
+    mutatesState: false;
+    preview: unknown;
+  };
+};
+
+type PrometheusControlPreviewFailure = {
+  ok: false;
+  error: PrometheusControlPreviewError;
+};
+
+export type PrometheusControlPreviewResult =
+  | PrometheusControlPreviewSuccess
+  | PrometheusControlPreviewFailure;
+
+function isMutationFitnessSnapshotInput(value: unknown): value is MutationFitnessSnapshotInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<MutationFitnessSnapshotInput>;
+  return (
+    typeof candidate.objectiveFit === "number" &&
+    Number.isFinite(candidate.objectiveFit) &&
+    typeof candidate.stability === "number" &&
+    Number.isFinite(candidate.stability) &&
+    typeof candidate.throughput === "number" &&
+    Number.isFinite(candidate.throughput)
+  );
+}
+
+function resolveMutationRisk(value: unknown): "low" | "medium" | "high" {
+  if (value === "low" || value === "high") {
+    return value;
+  }
+  return "medium";
+}
+
+function invalidRequest(message: string): PrometheusControlPreviewFailure {
+  return {
+    ok: false,
+    error: {
+      code: ErrorCodes.INVALID_REQUEST,
+      message,
+    },
+  };
+}
+
+function unavailableError(error: unknown): PrometheusControlPreviewFailure {
+  return {
+    ok: false,
+    error: {
+      code: ErrorCodes.UNAVAILABLE,
+      message: formatForLog(error),
+    },
+  };
+}
+
+export function isPrometheusControlPreviewAction(
+  value: unknown,
+): value is PrometheusControlPreviewAction {
+  return (
+    typeof value === "string" &&
+    PROMETHEUS_CONTROL_PREVIEW_ACTIONS.includes(value as PrometheusControlPreviewAction)
+  );
+}
+
+export async function runPrometheusControlPreview(
+  params: Record<string, unknown>,
+): Promise<PrometheusControlPreviewResult> {
+  try {
+    const rawAction =
+      typeof params.action === "string" && params.action.trim().length > 0
+        ? params.action.trim()
+        : null;
+    if (!rawAction) {
+      return invalidRequest("action is required for prometheus.control.preview");
+    }
+    if (!isPrometheusControlPreviewAction(rawAction)) {
+      return invalidRequest(`Unsupported control preview action "${rawAction}"`);
+    }
+
+    const stateDir = resolveObserverStateDir(params);
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    const events = await eventStore.readAll();
+    const state = replayPrometheusEvents(events);
+    const now = Date.now();
+
+    if (rawAction === "autarch.gap-detection") {
+      const suggestions = detectCapabilityGapsFromFailedPaths({
+        state,
+        now,
+        maxSuggestions: resolveMaxItems(params, 10),
+      });
+      return {
+        ok: true,
+        payload: {
+          ts: now,
+          action: rawAction,
+          mutatesState: false,
+          preview: {
+            suggestedGapCount: suggestions.length,
+            suggestions: suggestions.map((suggestion) => ({
+              suggestionId: suggestion.suggestionId,
+              goalId: suggestion.goalId,
+              severity: suggestion.severity,
+              description: suggestion.description,
+            })),
+          },
+        },
+      };
+    }
+
+    if (rawAction === "helios.trajectory-evaluation") {
+      const goalId =
+        typeof params.goalId === "string" && params.goalId.trim().length > 0
+          ? params.goalId.trim()
+          : null;
+      if (!goalId) {
+        return invalidRequest("goalId is required for HELIOS preview");
+      }
+      const goal = state.goals[goalId];
+      if (!goal) {
+        return invalidRequest(`Unknown goalId "${goalId}"`);
+      }
+      const snapshot = computeGoalTrajectorySnapshot({
+        state,
+        rootGoalId: goalId,
+        at: now,
+      });
+      const trajectoryStore = createFileHeliosTrajectoryStore(
+        path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+      );
+      const snapshots = await trajectoryStore.readWindow({
+        goalId,
+        maxSnapshots: resolveTrajectoryWindowSize(params),
+      });
+      const divergence = detectTrajectoryDivergence({ snapshots });
+      return {
+        ok: true,
+        payload: {
+          ts: now,
+          action: rawAction,
+          mutatesState: false,
+          preview: {
+            goalId,
+            goalStatus: goal.status,
+            computedSnapshot: snapshot,
+            priorWindowSize: snapshots.length,
+            divergence,
+          },
+        },
+      };
+    }
+
+    const proposal = params.proposal;
+    const baseline = params.baseline;
+    const candidate = params.candidate;
+    if (!proposal || typeof proposal !== "object") {
+      return invalidRequest("proposal object is required");
+    }
+    if (!isMutationFitnessSnapshotInput(baseline) || !isMutationFitnessSnapshotInput(candidate)) {
+      return invalidRequest("baseline and candidate fitness snapshots are required");
+    }
+    const proposalRecord = proposal as Record<string, unknown>;
+    const mutationId =
+      typeof proposalRecord.mutationId === "string" && proposalRecord.mutationId.trim()
+        ? proposalRecord.mutationId.trim()
+        : null;
+    const title =
+      typeof proposalRecord.title === "string" && proposalRecord.title.trim()
+        ? proposalRecord.title.trim()
+        : null;
+    const hypothesis =
+      typeof proposalRecord.hypothesis === "string" && proposalRecord.hypothesis.trim()
+        ? proposalRecord.hypothesis.trim()
+        : null;
+    const expectedGain =
+      typeof proposalRecord.expectedGain === "number" &&
+      Number.isFinite(proposalRecord.expectedGain)
+        ? proposalRecord.expectedGain
+        : 0;
+    if (!mutationId || !title || !hypothesis) {
+      return invalidRequest("proposal requires mutationId, title, and hypothesis");
+    }
+    const evaluation = evaluateMutationProposal({
+      proposal: {
+        mutationId,
+        title,
+        hypothesis,
+        risk: resolveMutationRisk(proposalRecord.risk),
+        expectedGain,
+      },
+      baseline,
+      candidate,
+    });
+    return {
+      ok: true,
+      payload: {
+        ts: now,
+        action: rawAction,
+        mutatesState: false,
+        preview: {
+          evaluation,
+        },
+      },
+    };
+  } catch (error) {
+    return unavailableError(error);
+  }
+}

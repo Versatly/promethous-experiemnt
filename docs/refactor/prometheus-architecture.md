@@ -124,6 +124,10 @@ These methods are intentionally scoped to telemetry and read models. They do not
   - `action`
   - `mutatesState`
   - `preview`
+  - supported `action` values:
+    - `autarch.gap-detection`
+    - `helios.trajectory-evaluation`
+    - `recursion.mutation-evaluation`
 
 Compatibility tests lock this response shape so method consumers can rely on stable key-level
 contracts during migration.
