@@ -402,12 +402,16 @@ export function createPrometheusHandlers(deps?: PrometheusHandlersDeps): Gateway
       }
     },
     "prometheus.control.preview": async ({ respond, params }) => {
-      const result = await runControlPreview(params, controlPreviewDeps);
-      if (!result.ok) {
-        respond(false, undefined, errorShape(result.error.code, result.error.message));
-        return;
+      try {
+        const result = await runControlPreview(params, controlPreviewDeps);
+        if (!result.ok) {
+          respond(false, undefined, errorShape(result.error.code, result.error.message));
+          return;
+        }
+        respond(true, result.payload, undefined);
+      } catch (error) {
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(error)));
       }
-      respond(true, result.payload, undefined);
     },
     "prometheus.monolith": async ({ respond, params }) => {
       try {
