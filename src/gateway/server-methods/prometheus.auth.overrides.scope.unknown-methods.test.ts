@@ -126,6 +126,37 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
     expectNoPrometheusAuthOverrideInvocations(authOverrides);
   });
 
+  it("keeps node-role denial precedence over admin scopes for unknown methods", async () => {
+    const unknownMethodHandler = vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    });
+    const authOverrides = createThrowingPrometheusAuthOverrides("node-denied unknown method");
+    const respond = vi.fn();
+    await runPrometheusNodeRequest({
+      request: {
+        id: "unknown-prometheus-method-node-admin-scope-denied-before-handler-dispatch",
+        method: UNKNOWN_PROMETHEUS_METHOD,
+        params: {},
+      },
+      scopes: ["operator.admin"],
+      authOverrides,
+      extraHandlers: {
+        [UNKNOWN_PROMETHEUS_METHOD]: unknownMethodHandler,
+      },
+      respond,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("unauthorized role: node"),
+      }),
+    );
+    expect(unknownMethodHandler).not.toHaveBeenCalled();
+    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+  });
+
   it("does not dispatch injected unknown handlers when non-operator role is denied", async () => {
     const unknownMethodHandler = vi.fn(async ({ respond }) => {
       respond(true, { ok: true }, undefined);
