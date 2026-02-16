@@ -144,6 +144,53 @@ describe("prometheusHandlers dependency isolation", () => {
     expect(controlPreviewDeps.resolvePlannedActionPreflight).not.toHaveBeenCalled();
   });
 
+  it("prefers injected preview runner over default planned-action deps", async () => {
+    const resolvePlannedActionMetadata = vi.fn(() => {
+      throw new Error("default preview runner should not invoke planned-action metadata");
+    });
+    const runControlPreview = vi.fn(async () => ({
+      ok: false as const,
+      error: {
+        code: ErrorCodes.UNAVAILABLE,
+        message: "injected preview runner handled planned action",
+      },
+    }));
+    const handlers = createPrometheusHandlers({
+      runControlPreview,
+      controlPreviewDeps: {
+        resolvePlannedActionMetadata,
+      },
+    });
+
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "preview-injected-runner-precedence",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "autarch.gap-detection.commit",
+        goalId: "goal-1",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: ErrorCodes.UNAVAILABLE,
+        message: "injected preview runner handled planned action",
+      }),
+    );
+    expect(runControlPreview).toHaveBeenCalledTimes(1);
+    expect(resolvePlannedActionMetadata).not.toHaveBeenCalled();
+  });
+
   it("uses controlPreviewDeps with default preview runner for planned actions", async () => {
     const resolvePlannedActionMetadata = vi.fn(() => {
       throw new Error("planned-action metadata dependency exploded");
@@ -181,5 +228,42 @@ describe("prometheusHandlers dependency isolation", () => {
         message: expect.stringContaining("planned-action metadata dependency exploded"),
       }),
     );
+  });
+
+  it("does not invoke default preview planned-action deps for active actions", async () => {
+    const resolvePlannedActionMetadata = vi.fn(() => {
+      throw new Error("planned-action metadata dependency should not run for active actions");
+    });
+    const handlers = createPrometheusHandlers({
+      controlPreviewDeps: {
+        resolvePlannedActionMetadata,
+      },
+    });
+
+    const respond = vi.fn();
+    await handlers["prometheus.control.preview"]({
+      req: {
+        type: "req",
+        id: "preview-default-runner-active-action-short-circuit",
+        method: "prometheus.control.preview",
+      },
+      params: {
+        action: "autarch.gap-detection",
+      },
+      client: null,
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        action: "autarch.gap-detection",
+        mutatesState: false,
+      }),
+      undefined,
+    );
+    expect(resolvePlannedActionMetadata).not.toHaveBeenCalled();
   });
 });
