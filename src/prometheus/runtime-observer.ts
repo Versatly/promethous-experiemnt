@@ -3,6 +3,7 @@ import type { AgentEventPayload } from "../infra/agent-events.js";
 import type { PrometheusState } from "./state.js";
 import { resolveStateDir } from "../config/paths.js";
 import { onAgentEvent } from "../infra/agent-events.js";
+import { runAutarchGapDetectionCycle } from "./autarch/cycle.js";
 import { createFilePrometheusEventStore, type PrometheusEventStore } from "./event-store.js";
 import {
   createHeliosTrajectoryEvaluator,
@@ -39,6 +40,7 @@ export type PrometheusRuntimeObserverOptions = {
   trajectoryLogPath?: string;
   rootGoalIds?: readonly string[];
   trajectoryWindowSize?: number;
+  enableAutarchGapDetection?: boolean;
   subscribe?: (listener: (evt: AgentEventPayload) => void) => () => void;
   eventStore?: PrometheusEventStore;
   evaluator?: HeliosTrajectoryEvaluator;
@@ -133,6 +135,8 @@ export function startPrometheusRuntimeObserver(
       now: options.now,
     });
   const subscribe = options.subscribe ?? onAgentEvent;
+  const autarchGapDetectionEnabled =
+    options.enableAutarchGapDetection ?? process.env.OPENCLAW_PROMETHEUS_AUTARCH_OBSERVER === "1";
   let queue: Promise<void> = Promise.resolve();
 
   const evaluate = async (evt: AgentEventPayload) => {
@@ -179,6 +183,21 @@ export function startPrometheusRuntimeObserver(
           continue;
         }
         logger.info("HELIOS divergence signal observed.", meta);
+      }
+
+      if (autarchGapDetectionEnabled && evt.data?.phase === "error") {
+        const autarchResult = await runAutarchGapDetectionCycle({
+          eventStore,
+          now: options.now ? options.now() : evt.ts,
+          actorAgentId: "prometheus-runtime-observer",
+        });
+        if (autarchResult.appendedEventCount > 0) {
+          logger.warn("AUTARCH gap detection emitted capability gaps.", {
+            runId: evt.runId,
+            appendedEventCount: autarchResult.appendedEventCount,
+            goalIds: autarchResult.suggestions.map((suggestion) => suggestion.goalId),
+          });
+        }
       }
     } catch (error) {
       logger.warn("PROMETHEUS observer evaluation failed.", {

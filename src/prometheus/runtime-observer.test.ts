@@ -34,7 +34,7 @@ describe("startPrometheusRuntimeObserver", () => {
     observer.stop();
   });
 
-  it("evaluates trajectories on terminal lifecycle events", async () => {
+  it("evaluates trajectories and runs AUTARCH gap detection on lifecycle errors", async () => {
     const dir = await makeTempDir("prometheus-runtime-observer-");
     const eventLogPath = path.join(dir, "events.jsonl");
     const trajectoryLogPath = path.join(dir, "trajectory.jsonl");
@@ -65,6 +65,7 @@ describe("startPrometheusRuntimeObserver", () => {
     };
     const observer = startPrometheusRuntimeObserver({
       enabled: true,
+      enableAutarchGapDetection: true,
       subscribe,
       eventLogPath,
       trajectoryLogPath,
@@ -101,9 +102,15 @@ describe("startPrometheusRuntimeObserver", () => {
 
     const trajectoryStore = createFileHeliosTrajectoryStore(trajectoryLogPath);
     const snapshots = await trajectoryStore.readWindow({ goalId: "root" });
+    const events = await eventStore.readAll();
+    const gapEvents = events.filter((event) => event.type === "capability-gap.detected");
     expect(snapshots).toHaveLength(2);
+    expect(gapEvents).toHaveLength(1);
     expect(logger.error).toHaveBeenCalled();
-    expect(logger.warn).toHaveBeenCalledTimes(0);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "AUTARCH gap detection emitted capability gaps.",
+      expect.objectContaining({ appendedEventCount: 1 }),
+    );
     observer.stop();
   });
 });
