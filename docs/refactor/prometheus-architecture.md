@@ -64,6 +64,65 @@ Cutover can happen only when parity criteria are met for:
 - channel send and receive reliability
 - policy and approval enforcement semantics.
 
+## Gateway compatibility adapters (read-only)
+
+To keep existing gateway consumers stable while PROMETHEUS internals evolve, the gateway now exposes
+read-only compatibility adapters under the `prometheus.*` namespace:
+
+1. `prometheus.status`
+2. `prometheus.trajectory`
+3. `prometheus.goals`
+4. `prometheus.recursion`
+5. `prometheus.monolith`
+
+These methods are intentionally scoped to telemetry and read models. They do not mutate state.
+
+### Adapter payload contract (top-level fields)
+
+- `prometheus.status`:
+  - `ts`
+  - `eventCount`
+  - `summary`
+  - `rootGoals`
+  - `alignment`
+- `prometheus.trajectory`:
+  - `ts`
+  - `goal`
+  - `windowSize`
+  - `sinceAt`
+  - `snapshotCount`
+  - `latest`
+  - `scoreDeltaFromPrevious`
+  - `divergence`
+  - `snapshots`
+- `prometheus.goals`:
+  - `ts`
+  - `total`
+  - `goals`
+- `prometheus.recursion`:
+  - `ts`
+  - `windowSize`
+  - `totals`
+  - `cycles`
+- `prometheus.monolith`:
+  - `ts`
+  - `summary`
+  - `totalsByForm`
+  - `institutions`
+  - `allocationPreview`
+
+Compatibility tests lock this response shape so method consumers can rely on stable key-level
+contracts during migration.
+
+### Access policy
+
+All `prometheus.*` gateway adapters are read-scope methods:
+
+- allowed for `operator.read`, `operator.write`, and `operator.admin`
+- rejected when read scope is missing.
+
+This keeps parity with existing gateway authorization semantics for telemetry methods.
+
 ## Scope boundaries
 
 The initial PROMETHEUS implementation in this repository focuses on:
