@@ -263,4 +263,45 @@ describe("PROMETHEUS gateway authorization", () => {
       );
     }
   });
+
+  it("keeps planned-method UNAVAILABLE fallback at request handling when preflight resolver misses", async () => {
+    const method = "prometheus.control.execute";
+    const metadata = getPrometheusPlannedMutatingMethodMetadata(method);
+    expect(metadata).toBeDefined();
+    if (!metadata) {
+      return;
+    }
+    const preflight = buildPrometheusPlannedMutatingMethodPreflight({ method, metadata });
+    const respond = vi.fn();
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "planned-fallback-request-level",
+        method,
+        params: {},
+      },
+      client: {
+        connect: {
+          role: "operator",
+          scopes: ["operator.write"],
+        },
+      },
+      isWebchatConnect: () => false,
+      respond,
+      context: {} as GatewayRequestContext,
+      authOverrides: {
+        resolvePrometheusPlannedMethodPreflight: () => undefined,
+        resolvePrometheusPlannedMethodMetadata: () => metadata,
+      },
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        code: "UNAVAILABLE",
+        message: preflight.disabledMessage,
+      }),
+    );
+  });
 });

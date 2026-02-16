@@ -116,6 +116,16 @@ const WRITE_METHODS = new Set([
   ...PROMETHEUS_WRITE_METHODS,
 ]);
 
+type GatewayAuthorizationOverrides = {
+  resolvePrometheusMethodMetadata?: (method: string) => PrometheusGatewayMethodMetadata | undefined;
+  resolvePrometheusPlannedMethodPreflight?: (
+    method: string,
+  ) => PrometheusPlannedMutatingMethodPreflight | undefined;
+  resolvePrometheusPlannedMethodMetadata?: (
+    method: string,
+  ) => ReturnType<typeof getPrometheusPlannedMutatingMethodMetadata>;
+};
+
 function mutatingControlsDisabledError() {
   return errorShape(
     ErrorCodes.UNAVAILABLE,
@@ -172,7 +182,11 @@ export function getPrometheusPlannedMutatingMethodGuardError(args: {
     : errorShape(ErrorCodes.UNAVAILABLE, preflight.disabledMessage);
 }
 
-function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
+function authorizeGatewayMethod(
+  method: string,
+  client: GatewayRequestOptions["client"],
+  overrides?: GatewayAuthorizationOverrides,
+) {
   if (!client?.connect) {
     return null;
   }
@@ -190,11 +204,18 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   if (role !== "operator") {
     return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${role}`);
   }
-  const mutatingControlGuardError = getPrometheusMutatingControlGuardError({ method });
+  const mutatingControlGuardError = getPrometheusMutatingControlGuardError({
+    method,
+    resolveMethodMetadata: overrides?.resolvePrometheusMethodMetadata,
+  });
   if (mutatingControlGuardError) {
     return mutatingControlGuardError;
   }
-  const plannedMutatingMethodGuardError = getPrometheusPlannedMutatingMethodGuardError({ method });
+  const plannedMutatingMethodGuardError = getPrometheusPlannedMutatingMethodGuardError({
+    method,
+    resolvePlannedMethodPreflight: overrides?.resolvePrometheusPlannedMethodPreflight,
+    resolvePlannedMethodMetadata: overrides?.resolvePrometheusPlannedMethodMetadata,
+  });
   if (plannedMutatingMethodGuardError) {
     return plannedMutatingMethodGuardError;
   }
@@ -282,10 +303,13 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
 };
 
 export async function handleGatewayRequest(
-  opts: GatewayRequestOptions & { extraHandlers?: GatewayRequestHandlers },
+  opts: GatewayRequestOptions & {
+    extraHandlers?: GatewayRequestHandlers;
+    authOverrides?: GatewayAuthorizationOverrides;
+  },
 ): Promise<void> {
   const { req, respond, client, isWebchatConnect, context } = opts;
-  const authError = authorizeGatewayMethod(req.method, client);
+  const authError = authorizeGatewayMethod(req.method, client, opts.authOverrides);
   if (authError) {
     respond(false, undefined, authError);
     return;
