@@ -11,6 +11,33 @@ import {
 
 const UNKNOWN_PROMETHEUS_METHOD = "prometheus.unknown.gateway.method";
 
+function createUnknownMethodDispatchHarness(prefix: string) {
+  return {
+    unknownMethodHandler: vi.fn(async ({ respond }) => {
+      respond(true, { ok: true }, undefined);
+    }),
+    authOverrides: createThrowingPrometheusAuthOverrides(prefix),
+    respond: vi.fn(),
+  };
+}
+
+function expectUnknownMethodDeniedBeforeDispatch(args: {
+  respond: ReturnType<typeof vi.fn>;
+  unknownMethodHandler: ReturnType<typeof vi.fn>;
+  authOverrides: ReturnType<typeof createThrowingPrometheusAuthOverrides>;
+  expectedMessage: string;
+}) {
+  expect(args.respond).toHaveBeenCalledWith(
+    false,
+    undefined,
+    expect.objectContaining({
+      message: expect.stringContaining(args.expectedMessage),
+    }),
+  );
+  expect(args.unknownMethodHandler).not.toHaveBeenCalled();
+  expectNoPrometheusAuthOverrideInvocations(args.authOverrides);
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
 });
@@ -41,11 +68,9 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
   });
 
   it("does not dispatch injected unknown handlers when unknown method is scope-denied", async () => {
-    const unknownMethodHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("unknown scope-denied method");
-    const respond = vi.fn();
+    const { unknownMethodHandler, authOverrides, respond } = createUnknownMethodDispatchHarness(
+      "unknown scope-denied method",
+    );
     await runPrometheusOperatorRequest({
       request: {
         id: "unknown-prometheus-method-scope-denied-before-handler-dispatch",
@@ -60,15 +85,12 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       },
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("missing scope: operator.admin"),
-      }),
-    );
-    expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectUnknownMethodDeniedBeforeDispatch({
+      respond,
+      unknownMethodHandler,
+      authOverrides,
+      expectedMessage: "missing scope: operator.admin",
+    });
   });
 
   it("dispatches injected unknown handlers under admin scope without invoking PROMETHEUS auth overrides", async () => {
@@ -97,11 +119,9 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
   });
 
   it("does not dispatch injected unknown handlers when node role is denied", async () => {
-    const unknownMethodHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("node-denied unknown method");
-    const respond = vi.fn();
+    const { unknownMethodHandler, authOverrides, respond } = createUnknownMethodDispatchHarness(
+      "node-denied unknown method",
+    );
     await runPrometheusNodeRequest({
       request: {
         id: "unknown-prometheus-method-node-denied-before-handler-dispatch",
@@ -115,23 +135,18 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("unauthorized role: node"),
-      }),
-    );
-    expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectUnknownMethodDeniedBeforeDispatch({
+      respond,
+      unknownMethodHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: node",
+    });
   });
 
   it("keeps node-role denial precedence over admin scopes for unknown methods", async () => {
-    const unknownMethodHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("node-denied unknown method");
-    const respond = vi.fn();
+    const { unknownMethodHandler, authOverrides, respond } = createUnknownMethodDispatchHarness(
+      "node-denied unknown method",
+    );
     await runPrometheusNodeRequest({
       request: {
         id: "unknown-prometheus-method-node-admin-scope-denied-before-handler-dispatch",
@@ -146,23 +161,18 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("unauthorized role: node"),
-      }),
-    );
-    expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectUnknownMethodDeniedBeforeDispatch({
+      respond,
+      unknownMethodHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: node",
+    });
   });
 
   it("does not dispatch injected unknown handlers when non-operator role is denied", async () => {
-    const unknownMethodHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("non-operator unknown method");
-    const respond = vi.fn();
+    const { unknownMethodHandler, authOverrides, respond } = createUnknownMethodDispatchHarness(
+      "non-operator unknown method",
+    );
     await runPrometheusRoleRequest({
       role: "auditor",
       request: {
@@ -177,23 +187,17 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("unauthorized role: auditor"),
-      }),
-    );
-    expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectUnknownMethodDeniedBeforeDispatch({
+      respond,
+      unknownMethodHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: auditor",
+    });
   });
 
   it("does not dispatch injected unknown handlers when runtime role value is malformed", async () => {
-    const unknownMethodHandler = vi.fn(async ({ respond }) => {
-      respond(true, { ok: true }, undefined);
-    });
-    const authOverrides = createThrowingPrometheusAuthOverrides("malformed unknown role");
-    const respond = vi.fn();
+    const { unknownMethodHandler, authOverrides, respond } =
+      createUnknownMethodDispatchHarness("malformed unknown role");
     await runPrometheusRoleRequest({
       role: 7 as never,
       request: {
@@ -208,14 +212,11 @@ describe("PROMETHEUS gateway authorization override invocation scope (unknown me
       respond,
     });
 
-    expect(respond).toHaveBeenCalledWith(
-      false,
-      undefined,
-      expect.objectContaining({
-        message: expect.stringContaining("unauthorized role: 7"),
-      }),
-    );
-    expect(unknownMethodHandler).not.toHaveBeenCalled();
-    expectNoPrometheusAuthOverrideInvocations(authOverrides);
+    expectUnknownMethodDeniedBeforeDispatch({
+      respond,
+      unknownMethodHandler,
+      authOverrides,
+      expectedMessage: "unauthorized role: 7",
+    });
   });
 });
