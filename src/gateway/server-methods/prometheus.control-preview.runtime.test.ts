@@ -1,13 +1,17 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createFileHeliosTrajectoryStore,
-  createFilePrometheusEventStore,
-} from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import { runPrometheusControlPreview } from "./prometheus.control-preview.js";
 import { formatPrometheusMissingRequiredParamsMessage } from "./prometheus.preflight-guards.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createGoalCreatedEvent,
+  createRecursionFitnessSnapshot,
+  createRecursionMutationProposal,
+} from "./prometheus.test-events.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+  createPrometheusTrajectoryStoreForStateDir,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -41,21 +45,16 @@ describe("prometheus control preview runtime flows", () => {
 
   it("returns AUTARCH gap-detection preview for blocked goals", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.appendBatch([
-      {
+      createGoalCreatedEvent({
         id: "evt-goal",
-        type: "goal.created",
         occurredAt: 1,
-        payload: {
-          goalId: "goal-autarch",
-          title: "AUTARCH goal",
-          objective: "Find missing capabilities",
-          priority: 90,
-        },
-      },
+        goalId: "goal-autarch",
+        title: "AUTARCH goal",
+        objective: "Find missing capabilities",
+        priority: 90,
+      }),
       {
         id: "evt-goal-status",
         type: "goal.status-updated",
@@ -92,23 +91,18 @@ describe("prometheus control preview runtime flows", () => {
 
   it("returns HELIOS trajectory-evaluation preview with computed snapshot", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
-    const trajectoryStore = createFileHeliosTrajectoryStore(
-      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
-    );
-    await eventStore.append({
-      id: "evt-goal",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+    const trajectoryStore = createPrometheusTrajectoryStoreForStateDir(stateDir);
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-goal",
+        occurredAt: 1,
         goalId: "goal-helios",
         title: "HELIOS goal",
         objective: "Evaluate trajectory",
         priority: 88,
-      },
-    });
+      }),
+    );
     await trajectoryStore.append({
       goalId: "goal-helios",
       snapshot: {
@@ -144,41 +138,37 @@ describe("prometheus control preview runtime flows", () => {
 
   it("returns recursion mutation-evaluation preview with accepted decision", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
-    await eventStore.append({
-      id: "evt-goal",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-goal",
+        occurredAt: 1,
         goalId: "goal-recursion",
         title: "Recursion goal",
         objective: "Evaluate mutation",
         priority: 91,
-      },
-    });
+      }),
+    );
 
     const result = await runPrometheusControlPreview({
       stateDir,
       action: "recursion.mutation-evaluation",
-      proposal: {
+      proposal: createRecursionMutationProposal({
         mutationId: "mut-1",
         title: "Increase planning horizon",
         hypothesis: "improves objective fit",
-        risk: "low",
         expectedGain: 0.09,
-      },
-      baseline: {
+      }),
+      baseline: createRecursionFitnessSnapshot({
         objectiveFit: 0.5,
         stability: 0.75,
         throughput: 0.55,
-      },
-      candidate: {
+      }),
+      candidate: createRecursionFitnessSnapshot({
         objectiveFit: 0.66,
         stability: 0.76,
         throughput: 0.57,
-      },
+      }),
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {

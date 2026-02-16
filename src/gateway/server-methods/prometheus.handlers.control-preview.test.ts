@@ -1,16 +1,20 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createFileHeliosTrajectoryStore,
-  createFilePrometheusEventStore,
-} from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
   getPrometheusPlannedMutatingPreviewActionMetadata,
 } from "./prometheus.control-preview.js";
 import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createGoalCreatedEvent,
+  createRecursionFitnessSnapshot,
+  createRecursionMutationProposal,
+} from "./prometheus.test-events.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+  createPrometheusTrajectoryStoreForStateDir,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -21,21 +25,15 @@ afterEach(async () => {
 describe("prometheusHandlers.prometheus.control.preview", () => {
   it("returns AUTARCH gap-detection preview without mutating state", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
     await eventStore.appendBatch([
-      {
+      createGoalCreatedEvent({
         id: "evt-goal",
-        type: "goal.created",
         occurredAt: 1,
-        payload: {
-          goalId: "goal-root",
-          title: "Root objective",
-          objective: "ship system",
-          priority: 100,
-        },
-      },
+        goalId: "goal-root",
+        title: "Root objective",
+        objective: "ship system",
+      }),
       {
         id: "evt-goal-status",
         type: "goal.status-updated",
@@ -72,20 +70,16 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
 
   it("returns recursion mutation evaluation preview", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
-    await eventStore.append({
-      id: "evt-goal",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-goal",
+        occurredAt: 1,
         goalId: "goal-root",
         title: "Root objective",
         objective: "ship system",
-        priority: 100,
-      },
-    });
+      }),
+    );
 
     const respond = vi.fn();
     await runPrometheusControlPreviewHandler({
@@ -93,23 +87,21 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
       params: {
         stateDir,
         action: "recursion.mutation-evaluation",
-        proposal: {
+        proposal: createRecursionMutationProposal({
           mutationId: "mut-1",
           title: "Increase horizon",
           hypothesis: "better long-range trajectory",
-          risk: "low",
-          expectedGain: 0.1,
-        },
-        baseline: {
+        }),
+        baseline: createRecursionFitnessSnapshot({
           objectiveFit: 0.55,
           stability: 0.7,
           throughput: 0.5,
-        },
-        candidate: {
+        }),
+        candidate: createRecursionFitnessSnapshot({
           objectiveFit: 0.7,
           stability: 0.72,
           throughput: 0.52,
-        },
+        }),
       },
       respond,
     });
@@ -131,23 +123,18 @@ describe("prometheusHandlers.prometheus.control.preview", () => {
 
   it("returns HELIOS trajectory evaluation preview for known goal", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
-    await eventStore.append({
-      id: "evt-goal",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-goal",
+        occurredAt: 1,
         goalId: "goal-helios",
         title: "Helios goal",
         objective: "Track trajectory",
         priority: 80,
-      },
-    });
-    const trajectoryStore = createFileHeliosTrajectoryStore(
-      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+      }),
     );
+    const trajectoryStore = createPrometheusTrajectoryStoreForStateDir(stateDir);
     await trajectoryStore.append({
       goalId: "goal-helios",
       snapshot: {

@@ -22,3 +22,35 @@ export function createGoalCreatedEvent(args: GoalCreatedEventArgs) {
     },
   };
 }
+
+type RecursionMutationProposalArgs = {
+  mutationId: string;
+  title: string;
+  hypothesis: string;
+  risk?: "low" | "medium" | "high";
+  expectedGain?: number;
+};
+
+export function createRecursionMutationProposal(args: RecursionMutationProposalArgs) {
+  return {
+    mutationId: args.mutationId,
+    title: args.title,
+    hypothesis: args.hypothesis,
+    risk: args.risk ?? "low",
+    expectedGain: args.expectedGain ?? 0.1,
+  };
+}
+
+type RecursionFitnessSnapshotArgs = {
+  objectiveFit: number;
+  stability: number;
+  throughput: number;
+};
+
+export function createRecursionFitnessSnapshot(args: RecursionFitnessSnapshotArgs) {
+  return {
+    objectiveFit: args.objectiveFit,
+    stability: args.stability,
+    throughput: args.throughput,
+  };
+}

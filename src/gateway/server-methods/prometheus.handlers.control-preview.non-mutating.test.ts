@@ -1,11 +1,15 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createFileHeliosTrajectoryStore,
-  createFilePrometheusEventStore,
-} from "../../prometheus/index.js";
 import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createGoalCreatedEvent,
+  createRecursionFitnessSnapshot,
+  createRecursionMutationProposal,
+} from "./prometheus.test-events.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+  createPrometheusTrajectoryStoreForStateDir,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -16,23 +20,18 @@ afterEach(async () => {
 describe("prometheusHandlers.prometheus.control.preview non-mutating guarantees", () => {
   it("does not mutate event log across preview actions", async () => {
     const stateDir = await makeTempDir("gateway-prometheus-control-preview-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
-    await eventStore.append({
-      id: "evt-goal",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-goal",
+        occurredAt: 1,
         goalId: "goal-non-mutating",
         title: "Non-mutating goal",
         objective: "Verify preview does not write",
         priority: 75,
-      },
-    });
-    const trajectoryStore = createFileHeliosTrajectoryStore(
-      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+      }),
     );
+    const trajectoryStore = createPrometheusTrajectoryStoreForStateDir(stateDir);
     await trajectoryStore.append({
       goalId: "goal-non-mutating",
       snapshot: {
@@ -73,23 +72,22 @@ describe("prometheusHandlers.prometheus.control.preview non-mutating guarantees"
     });
     await callControlPreview({
       action: "recursion.mutation-evaluation",
-      proposal: {
+      proposal: createRecursionMutationProposal({
         mutationId: "mut-non-mutating",
         title: "Safe mutation",
         hypothesis: "should remain read-only",
-        risk: "low",
         expectedGain: 0.05,
-      },
-      baseline: {
+      }),
+      baseline: createRecursionFitnessSnapshot({
         objectiveFit: 0.51,
         stability: 0.7,
         throughput: 0.49,
-      },
-      candidate: {
+      }),
+      candidate: createRecursionFitnessSnapshot({
         objectiveFit: 0.6,
         stability: 0.71,
         throughput: 0.5,
-      },
+      }),
     });
 
     const afterCount = (await eventStore.readAll()).length;

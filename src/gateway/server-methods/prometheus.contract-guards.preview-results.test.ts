@@ -1,12 +1,16 @@
-import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  createFileHeliosTrajectoryStore,
-  createFilePrometheusEventStore,
-} from "../../prometheus/index.js";
 import { isPrometheusControlPreviewResult } from "./prometheus.contract-guards.js";
 import { runPrometheusControlPreview } from "./prometheus.control-preview.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import {
+  createGoalCreatedEvent,
+  createRecursionFitnessSnapshot,
+  createRecursionMutationProposal,
+} from "./prometheus.test-events.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+  createPrometheusTrajectoryStoreForStateDir,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -27,23 +31,18 @@ describe("prometheus contract guards (control preview results)", () => {
 
   it("accepts valid HELIOS preview success results", async () => {
     const stateDir = await makeTempDir("prometheus-contract-guards-preview-helios-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
-    await eventStore.append({
-      id: "evt-goal-helios",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-goal-helios",
+        occurredAt: 1,
         goalId: "goal-helios",
         title: "Helios goal",
         objective: "Track trajectory",
         priority: 80,
-      },
-    });
-    const trajectoryStore = createFileHeliosTrajectoryStore(
-      path.join(stateDir, "prometheus", "helios-trajectory.jsonl"),
+      }),
     );
+    const trajectoryStore = createPrometheusTrajectoryStoreForStateDir(stateDir);
     await trajectoryStore.append({
       goalId: "goal-helios",
       snapshot: {
@@ -68,23 +67,22 @@ describe("prometheus contract guards (control preview results)", () => {
     const result = await runPrometheusControlPreview({
       stateDir,
       action: "recursion.mutation-evaluation",
-      proposal: {
+      proposal: createRecursionMutationProposal({
         mutationId: "mut-1",
         title: "Scale horizon",
         hypothesis: "improve fitness",
         risk: "medium",
-        expectedGain: 0.1,
-      },
-      baseline: {
+      }),
+      baseline: createRecursionFitnessSnapshot({
         objectiveFit: 0.5,
         stability: 0.7,
         throughput: 0.45,
-      },
-      candidate: {
+      }),
+      candidate: createRecursionFitnessSnapshot({
         objectiveFit: 0.7,
         stability: 0.72,
         throughput: 0.51,
-      },
+      }),
     });
     expect(result.ok).toBe(true);
     expect(isPrometheusControlPreviewResult(result)).toBe(true);

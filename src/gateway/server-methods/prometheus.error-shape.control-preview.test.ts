@@ -1,6 +1,4 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import { ErrorCodes } from "../protocol/index.js";
 import {
   buildPrometheusPlannedMutatingPreviewActionPreflight,
@@ -8,7 +6,11 @@ import {
 } from "./prometheus.control-preview.js";
 import { runPrometheusControlPreviewHandler } from "./prometheus.handler-test-helpers.js";
 import { formatPrometheusMissingRequiredParamsMessage } from "./prometheus.preflight-guards.js";
-import { createPrometheusTempDirHarness } from "./prometheus.test-temp-dir.js";
+import { createGoalCreatedEvent } from "./prometheus.test-events.js";
+import {
+  createPrometheusEventStoreForStateDir,
+  createPrometheusTempDirHarness,
+} from "./prometheus.test-temp-dir.js";
 
 const { makeTempDir, cleanupTempDirs } = createPrometheusTempDirHarness();
 
@@ -49,19 +51,16 @@ describe("prometheus control-preview error shape parity", () => {
     );
 
     const stateDir = await makeTempDir("gateway-prometheus-errors-");
-    const eventStore = createFilePrometheusEventStore(
-      path.join(stateDir, "prometheus", "events.jsonl"),
-    );
-    await eventStore.append({
-      id: "evt-rec-goal",
-      type: "goal.created",
-      occurredAt: 1,
-      payload: {
+    const eventStore = createPrometheusEventStoreForStateDir(stateDir);
+    await eventStore.append(
+      createGoalCreatedEvent({
+        id: "evt-rec-goal",
+        occurredAt: 1,
         goalId: "goal-rec",
         title: "Recursion goal",
         objective: "Evaluate mutation",
-      },
-    });
+      }),
+    );
 
     const incompleteRecursionRespond = vi.fn();
     await runPrometheusControlPreviewHandler({
