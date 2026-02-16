@@ -345,4 +345,17 @@ describe("prometheus request test helpers", () => {
       }),
     ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
   });
+
+  it("throws descriptive error when helper request method is non-string at runtime", async () => {
+    await expect(
+      runPrometheusOperatorRequest({
+        request: {
+          id: "request-helper-invalid-non-string-method",
+          method: 123 as never,
+          params: {},
+        },
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow("PROMETHEUS request helper requires a non-empty request.method");
+  });
 });

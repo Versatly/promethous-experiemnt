@@ -240,4 +240,14 @@ describe("prometheus handler test helpers", () => {
       }),
     ).rejects.toThrow('Missing PROMETHEUS handler for method "prometheus.control.catalog"');
   });
+
+  it("throws descriptive error for unknown method keys at runtime", async () => {
+    await expect(
+      runPrometheusHandler({
+        method: "prometheus.unknown-method" as never,
+        requestId: "handler-helper-unknown-method-key",
+        respond: vi.fn(),
+      }),
+    ).rejects.toThrow('Missing PROMETHEUS handler for method "prometheus.unknown-method"');
+  });
 });
