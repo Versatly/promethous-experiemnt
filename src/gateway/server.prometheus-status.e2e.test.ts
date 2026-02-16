@@ -665,6 +665,64 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("returns HELIOS control preview payload for operator.write", async () => {
+    const stateDir = resolveStateDir();
+    const eventStore = createFilePrometheusEventStore(
+      path.join(stateDir, "prometheus", "events.jsonl"),
+    );
+    await eventStore.append({
+      id: "evt-control-helios-goal",
+      type: "goal.created",
+      occurredAt: 52,
+      payload: {
+        goalId: "goal-control-helios",
+        title: "Control HELIOS goal",
+        objective: "Preview HELIOS trajectory",
+        priority: 91,
+      },
+    });
+
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-helios-preview",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-helios-preview",
+        method: "prometheus.control.preview",
+        params: {
+          action: "helios.trajectory-evaluation",
+          goalId: "goal-control-helios",
+        },
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      payload?: {
+        action?: string;
+        mutatesState?: boolean;
+        preview?: {
+          goalId?: string;
+          computedSnapshot?: { score?: number };
+        };
+      };
+      error?: { message?: string };
+    };
+    expect(response.ok).toBe(true);
+    expect(response.payload?.action).toBe("helios.trajectory-evaluation");
+    expect(response.payload?.mutatesState).toBe(false);
+    expect(response.payload?.preview?.goalId).toBe("goal-control-helios");
+    expect(typeof response.payload?.preview?.computedSnapshot?.score).toBe("number");
+    expect(response.error).toBeUndefined();
+    ws.close();
+  });
+
   it("rejects operator.read scope for prometheus.control.preview", async () => {
     const { ws } = await harness.openClient({
       role: "operator",
@@ -691,6 +749,38 @@ describe("gateway prometheus.status", () => {
     };
     expect(response.ok).toBe(false);
     expect(response.error?.message).toContain("operator.write");
+    ws.close();
+  });
+
+  it("returns INVALID_REQUEST for unsupported control preview actions", async () => {
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-invalid-action",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-invalid-action",
+        method: "prometheus.control.preview",
+        params: {
+          action: "unsupported.action",
+        },
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { code?: string; message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.code).toBe("INVALID_REQUEST");
+    expect(response.error?.message).toContain(
+      'Unsupported control preview action "unsupported.action"',
+    );
     ws.close();
   });
 
