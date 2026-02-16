@@ -207,6 +207,39 @@ describe("prometheus contract guards", () => {
     expect(isPrometheusControlPreviewResult(malformedResult)).toBe(false);
   });
 
+  it("rejects control preview success results with recursion fitness bounds drift", () => {
+    const malformedResult = {
+      ok: true,
+      payload: {
+        ts: Date.now(),
+        action: "recursion.mutation-evaluation",
+        mutatesState: false,
+        preview: {
+          evaluation: {
+            mutationId: "mut-1",
+            accepted: true,
+            scoreDelta: 1.2,
+            baselineScore: 0.4,
+            candidateScore: 1.1,
+            rationale: "invalid bounds",
+          },
+        },
+      },
+    };
+    expect(isPrometheusControlPreviewResult(malformedResult)).toBe(false);
+  });
+
+  it("accepts control preview failure results with valid protocol error codes", () => {
+    const validFailureResult = {
+      ok: false,
+      error: {
+        code: "UNAVAILABLE",
+        message: "canonical error shape",
+      },
+    };
+    expect(isPrometheusControlPreviewResult(validFailureResult)).toBe(true);
+  });
+
   it("rejects control preview failure results with invalid protocol error codes", () => {
     const malformedResult = {
       ok: false,
