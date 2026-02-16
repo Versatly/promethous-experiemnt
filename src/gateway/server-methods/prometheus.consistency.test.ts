@@ -5,22 +5,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestContext } from "./types.js";
 import { createFilePrometheusEventStore } from "../../prometheus/index.js";
 import {
+  buildPrometheusPlannedMutatingMethodPreflight,
+  getPrometheusPlannedMutatingMethodMetadata,
   PROMETHEUS_GATEWAY_METHOD_METADATA,
   PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
 } from "./prometheus-methods.js";
 import {
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
   PROMETHEUS_CONTROL_PREVIEW_ACTIONS,
   PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
   PROMETHEUS_CONTROL_PREVIEW_ACTION_METADATA,
 } from "./prometheus.control-preview.js";
 import { prometheusHandlers } from "./prometheus.js";
-import {
-  formatPrometheusRequiredParamsMessage,
-  formatPlannedMutatingActionDisabledMessage,
-  formatPlannedMutatingActionNotImplementedMessage,
-  formatPlannedMutatingMethodDisabledMessage,
-  formatPlannedMutatingMethodNotImplementedMessage,
-} from "./prometheus.preflight-guards.js";
 
 const cleanupDirs = new Set<string>();
 
@@ -339,6 +336,17 @@ describe("prometheus adapter summary consistency", () => {
     expect(payload.controlPreview.actions.map((action) => action.action)).toEqual(
       expect.not.arrayContaining(Object.keys(PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA)),
     );
+    const plannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata(
+      "prometheus.control.execute",
+    );
+    const plannedActionMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(plannedMethodMetadata).toBeDefined();
+    expect(plannedActionMetadata).toBeDefined();
+    if (!plannedMethodMetadata || !plannedActionMetadata) {
+      return;
+    }
     expect(payload.guardrails.plannedMutatingMethods.length).toBeGreaterThan(0);
     expect(payload.guardrails.plannedMutatingMethods).toEqual(
       expect.arrayContaining([
@@ -349,20 +357,10 @@ describe("prometheus adapter summary consistency", () => {
           enabled: false,
           enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
           requiredParams: ["action"],
-          preflight: {
-            disabledMessage: formatPlannedMutatingMethodDisabledMessage(
-              "prometheus.control.execute",
-              "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-            ),
-            notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
-              "prometheus.control.execute",
-            ),
-            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
-              kind: "method",
-              name: "prometheus.control.execute",
-              requiredParams: ["action"],
-            }),
-          },
+          preflight: buildPrometheusPlannedMutatingMethodPreflight({
+            method: "prometheus.control.execute",
+            metadata: plannedMethodMetadata,
+          }),
         }),
       ]),
     );
@@ -374,20 +372,10 @@ describe("prometheus adapter summary consistency", () => {
           mutatesState: true,
           enabled: false,
           enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-          preflight: {
-            disabledMessage: formatPlannedMutatingActionDisabledMessage(
-              "autarch.gap-detection.commit",
-              "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-            ),
-            notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
-              "autarch.gap-detection.commit",
-            ),
-            requiredParamsMessage: formatPrometheusRequiredParamsMessage({
-              kind: "action",
-              name: "autarch.gap-detection.commit",
-              requiredParams: ["goalId"],
-            }),
-          },
+          preflight: buildPrometheusPlannedMutatingPreviewActionPreflight({
+            action: "autarch.gap-detection.commit",
+            metadata: plannedActionMetadata,
+          }),
         }),
       ]),
     );

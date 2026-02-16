@@ -6,8 +6,15 @@ import {
   createFilePrometheusEventStore,
 } from "../prometheus/index.js";
 import {
+  buildPrometheusPlannedMutatingMethodPreflight,
+  getPrometheusPlannedMutatingMethodMetadata,
+} from "./server-methods/prometheus-methods.js";
+import {
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
+} from "./server-methods/prometheus.control-preview.js";
+import {
   formatPrometheusMissingRequiredParamsMessage,
-  formatPrometheusRequiredParamsMessage,
   formatPlannedMutatingActionDisabledMessage,
   formatPlannedMutatingActionNotImplementedMessage,
   formatPlannedMutatingMethodDisabledMessage,
@@ -790,6 +797,18 @@ describe("gateway prometheus.status", () => {
         plannedMutatingPreviewActions: 3,
       }),
     );
+    const plannedMethodMetadata = getPrometheusPlannedMutatingMethodMetadata(
+      "prometheus.control.execute",
+    );
+    const plannedActionMetadata = getPrometheusPlannedMutatingPreviewActionMetadata(
+      "autarch.gap-detection.commit",
+    );
+    expect(plannedMethodMetadata).toBeDefined();
+    expect(plannedActionMetadata).toBeDefined();
+    if (!plannedMethodMetadata || !plannedActionMetadata) {
+      ws.close();
+      return;
+    }
     expect(response.payload?.guardrails).toEqual(
       expect.objectContaining({
         mutationsEnabled: false,
@@ -804,20 +823,10 @@ describe("gateway prometheus.status", () => {
             enabled: false,
             enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
             requiredParams: ["action"],
-            preflight: {
-              disabledMessage: formatPlannedMutatingMethodDisabledMessage(
-                "prometheus.control.execute",
-                "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-              ),
-              notImplementedMessage: formatPlannedMutatingMethodNotImplementedMessage(
-                "prometheus.control.execute",
-              ),
-              requiredParamsMessage: formatPrometheusRequiredParamsMessage({
-                kind: "method",
-                name: "prometheus.control.execute",
-                requiredParams: ["action"],
-              }),
-            },
+            preflight: buildPrometheusPlannedMutatingMethodPreflight({
+              method: "prometheus.control.execute",
+              metadata: plannedMethodMetadata,
+            }),
           }),
         ]),
         plannedMutatingPreviewActions: expect.arrayContaining([
@@ -826,20 +835,10 @@ describe("gateway prometheus.status", () => {
             mutatesState: true,
             enabled: false,
             enableEnvVar: "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-            preflight: {
-              disabledMessage: formatPlannedMutatingActionDisabledMessage(
-                "autarch.gap-detection.commit",
-                "OPENCLAW_PROMETHEUS_MUTATING_CONTROLS",
-              ),
-              notImplementedMessage: formatPlannedMutatingActionNotImplementedMessage(
-                "autarch.gap-detection.commit",
-              ),
-              requiredParamsMessage: formatPrometheusRequiredParamsMessage({
-                kind: "action",
-                name: "autarch.gap-detection.commit",
-                requiredParams: ["goalId"],
-              }),
-            },
+            preflight: buildPrometheusPlannedMutatingPreviewActionPreflight({
+              action: "autarch.gap-detection.commit",
+              metadata: plannedActionMetadata,
+            }),
           }),
         ]),
       }),

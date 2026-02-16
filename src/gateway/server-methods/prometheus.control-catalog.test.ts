@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildPrometheusPlannedMutatingMethodPreflight,
+  getPrometheusPlannedMutatingMethodMetadata,
   PROMETHEUS_MUTATING_CONTROLS_ENV,
   PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA,
 } from "./prometheus-methods.js";
 import { buildPrometheusControlCatalogSnapshot } from "./prometheus.control-catalog.js";
-import { PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA } from "./prometheus.control-preview.js";
 import {
-  formatPrometheusRequiredParamsMessage,
-  formatPlannedMutatingActionDisabledMessage,
-  formatPlannedMutatingActionNotImplementedMessage,
-  formatPlannedMutatingMethodDisabledMessage,
-  formatPlannedMutatingMethodNotImplementedMessage,
-} from "./prometheus.preflight-guards.js";
+  buildPrometheusPlannedMutatingPreviewActionPreflight,
+  getPrometheusPlannedMutatingPreviewActionMetadata,
+  PROMETHEUS_PLANNED_MUTATING_PREVIEW_ACTION_METADATA,
+} from "./prometheus.control-preview.js";
 
 describe("prometheus control catalog builder", () => {
   it("builds a consistent snapshot with summary counts", () => {
@@ -82,38 +81,34 @@ describe("prometheus control catalog builder", () => {
         (action) => action.enableEnvVar === PROMETHEUS_MUTATING_CONTROLS_ENV,
       ),
     ).toBe(true);
-    expect(
-      snapshot.guardrails.plannedMutatingMethods.every(
-        (method) =>
-          method.requiredParams.join(",") ===
-            PROMETHEUS_PLANNED_MUTATING_METHOD_METADATA[method.method]?.requiredParams.join(",") &&
-          method.preflight.disabledMessage ===
-            formatPlannedMutatingMethodDisabledMessage(method.method, method.enableEnvVar) &&
-          method.preflight.notImplementedMessage ===
-            formatPlannedMutatingMethodNotImplementedMessage(method.method) &&
-          method.preflight.requiredParamsMessage ===
-            formatPrometheusRequiredParamsMessage({
-              kind: "method",
-              name: method.method,
-              requiredParams: method.requiredParams,
-            }),
-      ),
-    ).toBe(true);
-    expect(
-      snapshot.guardrails.plannedMutatingPreviewActions.every(
-        (action) =>
-          action.preflight.disabledMessage ===
-            formatPlannedMutatingActionDisabledMessage(action.action, action.enableEnvVar) &&
-          action.preflight.notImplementedMessage ===
-            formatPlannedMutatingActionNotImplementedMessage(action.action) &&
-          action.preflight.requiredParamsMessage ===
-            formatPrometheusRequiredParamsMessage({
-              kind: "action",
-              name: action.action,
-              requiredParams: action.requiredParams,
-            }),
-      ),
-    ).toBe(true);
+    for (const method of snapshot.guardrails.plannedMutatingMethods) {
+      const metadata = getPrometheusPlannedMutatingMethodMetadata(method.method);
+      expect(metadata).toBeDefined();
+      if (!metadata) {
+        continue;
+      }
+      expect(method.requiredParams).toEqual(metadata.requiredParams);
+      expect(method.preflight).toEqual(
+        buildPrometheusPlannedMutatingMethodPreflight({
+          method: method.method,
+          metadata,
+        }),
+      );
+    }
+    for (const action of snapshot.guardrails.plannedMutatingPreviewActions) {
+      const metadata = getPrometheusPlannedMutatingPreviewActionMetadata(action.action);
+      expect(metadata).toBeDefined();
+      if (!metadata) {
+        continue;
+      }
+      expect(action.requiredParams).toEqual(metadata.requiredParams);
+      expect(action.preflight).toEqual(
+        buildPrometheusPlannedMutatingPreviewActionPreflight({
+          action: action.action,
+          metadata,
+        }),
+      );
+    }
   });
 
   it("keeps planned mutating method required params usable for future contract validation", () => {
