@@ -1,5 +1,5 @@
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { resolveStateDir } from "../config/paths.js";
 import {
   createFileHeliosTrajectoryStore,
@@ -18,6 +18,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await harness.close();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("gateway prometheus.status", () => {
@@ -1103,6 +1107,40 @@ describe("gateway prometheus.status", () => {
     ws.close();
   });
 
+  it("returns UNAVAILABLE not-implemented for planned mutating preview actions when env enabled", async () => {
+    vi.stubEnv("OPENCLAW_PROMETHEUS_MUTATING_CONTROLS", "1");
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-control-planned-enabled",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-control-planned-enabled",
+        method: "prometheus.control.preview",
+        params: {
+          action: "autarch.gap-detection.commit",
+          goalId: "goal-1",
+        },
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { code?: string; message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.code).toBe("UNAVAILABLE");
+    expect(response.error?.message).toContain(
+      'Planned mutating action "autarch.gap-detection.commit" is not implemented yet',
+    );
+    ws.close();
+  });
+
   it("returns UNAVAILABLE for planned mutating methods before rollout", async () => {
     const { ws } = await harness.openClient({
       role: "operator",
@@ -1129,6 +1167,37 @@ describe("gateway prometheus.status", () => {
     expect(response.error?.code).toBe("UNAVAILABLE");
     expect(response.error?.message).toContain(
       'planned mutating method "prometheus.control.execute" is disabled',
+    );
+    ws.close();
+  });
+
+  it("returns UNAVAILABLE not-implemented for planned mutating methods when env enabled", async () => {
+    vi.stubEnv("OPENCLAW_PROMETHEUS_MUTATING_CONTROLS", "1");
+    const { ws } = await harness.openClient({
+      role: "operator",
+      scopes: ["operator.write"],
+    });
+    const responseP = onceMessage(
+      ws,
+      (obj) => obj.type === "res" && obj.id === "prometheus-method-planned-enabled",
+      10_000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "prometheus-method-planned-enabled",
+        method: "prometheus.control.execute",
+        params: {},
+      }),
+    );
+    const response = (await responseP) as {
+      ok?: boolean;
+      error?: { code?: string; message?: string };
+    };
+    expect(response.ok).toBe(false);
+    expect(response.error?.code).toBe("UNAVAILABLE");
+    expect(response.error?.message).toContain(
+      'planned mutating method "prometheus.control.execute" is not implemented yet',
     );
     ws.close();
   });
